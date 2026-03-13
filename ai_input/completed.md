@@ -32,3 +32,19 @@
 
 ---
 
+添加notion成功后，在指定的slack channel 发送一条消息，包括提交的表单信息，和notion的链接
+
+---
+
+添加成功后，继续操作：
+- 再给指定用户发送一条信息，内容包括表单内容，已经2个操作按钮，一个是接受(Approve),一个是拒绝（Reject）
+    - 指定用户email通过env配置给出，然后通过slack api获取：https://docs.slack.dev/reference/methods/users.lookupByEmail
+    - 根据操作更新notion的对应page的Approval Status属性其中Approve对应Approved,Reject对应Rejected
+    - 按钮操作参考feedbackButtonsCallback的实现
+- 操作完后再给表单提交者（submitterId）,发送一条结果消息
+
+---
+参考 expenseClaimFormCallback 的实现，添加notion成功后，在指定的slack channel 发送一条消息，包括提交的表单信息，和notion的链接
+---
+
+
