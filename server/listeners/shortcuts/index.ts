@@ -1,8 +1,12 @@
 import type { App } from "@slack/bolt";
-import sampleShortcutCallback from "./sample-shortcut";
+import expenseClaimCallback from "./expense-claim";
+import newCandidateCallback from "./new-candidate";
+import newFeedbackCallback from "./new-feedback";
 
 const register = (app: App) => {
-  app.shortcut("sample_shortcut_id", sampleShortcutCallback);
+  app.shortcut("new_feedback", newFeedbackCallback);
+  app.shortcut("expense_claim", expenseClaimCallback);
+  app.shortcut("new_candidate", newCandidateCallback);
 };
 
 export default { register };

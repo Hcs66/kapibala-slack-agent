@@ -11,7 +11,7 @@ export const sampleCommandCallback = async ({
   try {
     await ack();
     await respond({
-      text: "Responding to the sample command!",
+      text: "ok",
       response_type: "ephemeral",
     });
   } catch (error) {
