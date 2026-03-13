@@ -1,6 +1,9 @@
 import type { AllMiddlewareArgs, SlackViewMiddlewareArgs } from "@slack/bolt";
+import type { FeedbackAttachment } from "~/lib/notion/feedback";
 import { createFeedback } from "~/lib/notion/feedback";
+import { uploadFileToNotion } from "~/lib/notion/file-upload";
 import { findNotionUser } from "~/lib/notion/user-map";
+import { downloadSlackFile, getSlackFileInfo } from "~/lib/slack/files";
 
 async function resolveNotionUserId(
   client: AllMiddlewareArgs["client"],
@@ -28,20 +31,44 @@ const feedbackFormCallback = async ({
     await ack();
 
     const values = view.state.values;
-
     const name = values.name.value.value ?? "";
     const type = values.type.value.selected_option?.value ?? "";
     const description = values.description.value.value ?? "";
-    const summary = values.summary.value.value ?? "";
-    const priority = values.priority.value.selected_option?.value ?? "";
+    const summary = "";
+    const priority =  "";
     const source = values.source.value.selected_option?.value ?? "";
     const customer = values.customer.value.value ?? "";
-    const assignedToSlackId = values.assigned_to.value.selected_user;
-    const dueDate = values.due_date.value.selected_date;
+    const assignedToSlackId = "";
+    const dueDate = "";
     const tags =
       values.tags.value.selected_options?.map(
         (opt: { value: string }) => opt.value,
       ) ?? [];
+
+    // Handle file attachments: Slack → download → Notion upload
+    const attachments: FeedbackAttachment[] = [];
+    const slackFiles =
+      (values.attachments?.value as unknown as { files?: { id: string }[] })
+        ?.files ?? [];
+    const botToken = process.env.SLACK_BOT_TOKEN;
+
+    if (slackFiles.length > 0 && botToken) {
+      for (const slackFile of slackFiles) {
+        const fileInfo = await getSlackFileInfo(client, slackFile.id);
+        if (!fileInfo) continue;
+
+        const buffer = await downloadSlackFile(fileInfo.url, botToken);
+        const result = await uploadFileToNotion(
+          buffer,
+          fileInfo.name,
+          fileInfo.mimetype,
+        );
+        attachments.push({
+          fileUploadId: result.fileUploadId,
+          filename: result.filename,
+        });
+      }
+    }
 
     const createdByNotionUserId = await resolveNotionUserId(
       client,
@@ -68,6 +95,7 @@ const feedbackFormCallback = async ({
       createdByNotionUserId,
       dueDate: dueDate ?? null,
       tags,
+      attachments,
     });
 
     await client.chat.postMessage({

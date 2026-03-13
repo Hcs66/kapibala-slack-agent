@@ -36,7 +36,7 @@ const newFeedbackCallback = async ({
           {
             type: "input",
             block_id: "name",
-            label: { type: "plain_text", text: "Name" },
+            label: { type: "plain_text", text: "Title" },
             element: {
               type: "plain_text_input",
               action_id: "value",
@@ -83,34 +83,6 @@ const newFeedbackCallback = async ({
           },
           {
             type: "input",
-            block_id: "summary",
-            label: { type: "plain_text", text: "Summary" },
-            element: {
-              type: "plain_text_input",
-              action_id: "value",
-              multiline: true,
-              placeholder: {
-                type: "plain_text",
-                text: "Brief summary",
-              },
-            },
-            optional: true,
-          },
-          {
-            type: "input",
-            block_id: "priority",
-            label: { type: "plain_text", text: "Priority" },
-            element: {
-              type: "static_select",
-              action_id: "value",
-              options: ["High", "Medium", "Low"].map((opt) => ({
-                text: { type: "plain_text" as const, text: opt },
-                value: opt,
-              })),
-            },
-          },
-          {
-            type: "input",
             block_id: "source",
             label: { type: "plain_text", text: "Source" },
             element: {
@@ -146,34 +118,6 @@ const newFeedbackCallback = async ({
           },
           {
             type: "input",
-            block_id: "assigned_to",
-            label: { type: "plain_text", text: "Assigned To" },
-            element: {
-              type: "users_select",
-              action_id: "value",
-              placeholder: {
-                type: "plain_text",
-                text: "Select a user",
-              },
-            },
-            optional: true,
-          },
-          {
-            type: "input",
-            block_id: "due_date",
-            label: { type: "plain_text", text: "Due Date" },
-            element: {
-              type: "datepicker",
-              action_id: "value",
-              placeholder: {
-                type: "plain_text",
-                text: "Select a date",
-              },
-            },
-            optional: true,
-          },
-          {
-            type: "input",
             block_id: "tags",
             label: { type: "plain_text", text: "Tags" },
             element: {
@@ -194,6 +138,17 @@ const newFeedbackCallback = async ({
                 text: { type: "plain_text" as const, text: opt },
                 value: opt,
               })),
+            },
+            optional: true,
+          },
+          {
+            type: "input",
+            block_id: "attachments",
+            label: { type: "plain_text", text: "Attachments" },
+            element: {
+              type: "file_input",
+              action_id: "value",
+              max_files: 5,
             },
             optional: true,
           },

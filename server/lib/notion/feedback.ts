@@ -1,6 +1,11 @@
 import type { CreatePageParameters } from "@notionhq/client/build/src/api-endpoints";
 import { notion } from "./client";
 
+export interface FeedbackAttachment {
+  fileUploadId: string;
+  filename: string;
+}
+
 export interface FeedbackData {
   name: string;
   type: string;
@@ -13,6 +18,7 @@ export interface FeedbackData {
   createdByNotionUserId: string | null;
   dueDate: string | null;
   tags: string[];
+  attachments: FeedbackAttachment[];
 }
 
 export async function createFeedback(data: FeedbackData) {
@@ -30,12 +36,6 @@ export async function createFeedback(data: FeedbackData) {
     },
     Description: {
       rich_text: [{ text: { content: data.description } }],
-    },
-    Summary: {
-      rich_text: [{ text: { content: data.summary } }],
-    },
-    Priority: {
-      select: { name: data.priority },
     },
     Source: {
       select: { name: data.source },
@@ -69,6 +69,16 @@ export async function createFeedback(data: FeedbackData) {
   if (data.tags.length > 0) {
     properties.Tags = {
       multi_select: data.tags.map((tag) => ({ name: tag })),
+    };
+  }
+
+  if (data.attachments.length > 0) {
+    properties.Attachments = {
+      files: data.attachments.map((att) => ({
+        type: "file_upload" as const,
+        file_upload: { id: att.fileUploadId },
+        name: att.filename,
+      })),
     };
   }
 
