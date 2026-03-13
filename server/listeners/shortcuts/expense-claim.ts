@@ -110,70 +110,12 @@ const expenseClaimCallback = async ({
           },
           {
             type: "input",
-            block_id: "payment_method",
-            label: { type: "plain_text", text: "Payment Method" },
-            element: {
-              type: "static_select",
-              action_id: "value",
-              options: ["Paynow", "OKX Transfer", "Bank Transfer", "Cash"].map(
-                (opt) => ({
-                  text: { type: "plain_text" as const, text: opt },
-                  value: opt,
-                }),
-              ),
-            },
-          },
-          {
-            type: "input",
-            block_id: "approver",
-            label: { type: "plain_text", text: "Approver" },
-            element: {
-              type: "users_select",
-              action_id: "value",
-              placeholder: {
-                type: "plain_text",
-                text: "Select an approver",
-              },
-            },
-            optional: true,
-          },
-          {
-            type: "input",
-            block_id: "payer",
-            label: { type: "plain_text", text: "Payer" },
-            element: {
-              type: "users_select",
-              action_id: "value",
-              placeholder: {
-                type: "plain_text",
-                text: "Select a payer",
-              },
-            },
-            optional: true,
-          },
-          {
-            type: "input",
             block_id: "invoice_attachment",
             label: { type: "plain_text", text: "Attachments" },
             element: {
               type: "file_input",
               action_id: "value",
               max_files: 5,
-            },
-            optional: true,
-          },
-          {
-            type: "input",
-            block_id: "notes",
-            label: { type: "plain_text", text: "Notes" },
-            element: {
-              type: "plain_text_input",
-              action_id: "value",
-              multiline: true,
-              placeholder: {
-                type: "plain_text",
-                text: "Additional notes",
-              },
             },
             optional: true,
           },

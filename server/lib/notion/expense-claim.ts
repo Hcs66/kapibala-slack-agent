@@ -42,12 +42,6 @@ export async function createExpenseClaim(data: ExpenseClaimData) {
     "Expense Type": {
       select: { name: data.expenseType },
     },
-    "Payment Method": {
-      select: { name: data.paymentMethod },
-    },
-    "Approval Status": {
-      status: { name: "Pending" },
-    },
     "Submission Date": {
       date: { start: new Date().toISOString().split("T")[0] },
     },
@@ -59,26 +53,8 @@ export async function createExpenseClaim(data: ExpenseClaimData) {
     };
   }
 
-  if (data.approverNotionUserId) {
-    properties.Approver = {
-      people: [{ id: data.approverNotionUserId }],
-    };
-  }
-
-  if (data.payerNotionUserId) {
-    properties.Payer = {
-      people: [{ id: data.payerNotionUserId }],
-    };
-  }
-
-  if (data.notes) {
-    properties.Notes = {
-      rich_text: [{ text: { content: data.notes } }],
-    };
-  }
-
   if (data.invoiceAttachments.length > 0) {
-    properties["Attachments"] = {
+    properties.Attachments = {
       files: data.invoiceAttachments.map((att) => ({
         type: "file_upload" as const,
         file_upload: { id: att.fileUploadId },
@@ -95,4 +71,18 @@ export async function createExpenseClaim(data: ExpenseClaimData) {
   });
 
   return page;
+}
+
+export async function updateExpenseClaimStatus(
+  pageId: string,
+  status: "Approved" | "Rejected",
+) {
+  await notion.pages.update({
+    page_id: pageId,
+    properties: {
+      "Approval Status": {
+        status: { name: status },
+      },
+    },
+  });
 }

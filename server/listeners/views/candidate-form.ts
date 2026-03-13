@@ -19,8 +19,7 @@ const candidateFormCallback = async ({
     const candidateName = values.candidate_name.value.value ?? "";
     const positionApplied =
       values.position_applied.value.selected_option?.value ?? "";
-    const currentStatus =
-      values.current_status.value.selected_option?.value ?? "";
+    const currentStatus = "";
     const resumeSource =
       values.resume_source.value.selected_option?.value ?? "";
     const phone = values.phone.value.value ?? "";
@@ -66,9 +65,49 @@ const candidateFormCallback = async ({
       resumeAttachments,
     });
 
+    const pageUrl = (page as { url: string }).url;
+    const submitterId = body.user.id;
+
+    const fields = [
+      `*Candidate Name:* ${candidateName}`,
+      `*Position Applied:* ${positionApplied}`,
+      `*Resume Source:* ${resumeSource}`,
+      `*Submitted By:* <@${submitterId}>`,
+    ];
+    if (phone) fields.push(`*Phone:* ${phone}`);
+    if (email) fields.push(`*Email:* ${email}`);
+    if (interviewTime) fields.push(`*Interview Time:* ${interviewTime}`);
+    if (zoomMeetingLink) fields.push(`*Zoom Meeting Link:* ${zoomMeetingLink}`);
+    if (resumeLink) fields.push(`*Resume Link:* <${resumeLink}|View Resume>`);
+    fields.push(`*Notion:* <${pageUrl}|View in Notion>`);
+
+    const notificationChannel = process.env.RECRUITMENT_CHANNEL_ID;
+    if (notificationChannel) {
+      await client.chat.postMessage({
+        channel: notificationChannel,
+        text: `New candidate: ${candidateName}`,
+        blocks: [
+          {
+            type: "header",
+            text: {
+              type: "plain_text",
+              text: "New Candidate",
+            },
+          },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: fields.join("\n"),
+            },
+          },
+        ],
+      });
+    }
+
     await client.chat.postMessage({
-      channel: body.user.id,
-      text: `Candidate saved: ${(page as { url: string }).url}`,
+      channel: submitterId,
+      text: `Candidate saved: ${pageUrl}`,
     });
   } catch (error) {
     logger.error("Candidate form submission failed:", error);

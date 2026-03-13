@@ -69,29 +69,6 @@ const newCandidateCallback = async ({
           },
           {
             type: "input",
-            block_id: "current_status",
-            label: { type: "plain_text", text: "Current Status" },
-            element: {
-              type: "static_select",
-              action_id: "value",
-              options: [
-                "Pending Review",
-                "Screening Passed",
-                "Awaiting Interview Schedule",
-                "Interview Scheduled",
-                "Round 1 Passed",
-                "Screening Failed",
-                "Round 1 Failed",
-                "Hired",
-                "Rejected",
-              ].map((opt) => ({
-                text: { type: "plain_text" as const, text: opt },
-                value: opt,
-              })),
-            },
-          },
-          {
-            type: "input",
             block_id: "resume_link",
             label: { type: "plain_text", text: "Resume Link" },
             element: {

@@ -35,7 +35,7 @@ const feedbackFormCallback = async ({
     const type = values.type.value.selected_option?.value ?? "";
     const description = values.description.value.value ?? "";
     const summary = "";
-    const priority =  "";
+    const priority = "";
     const source = values.source.value.selected_option?.value ?? "";
     const customer = values.customer.value.value ?? "";
     const assignedToSlackId = "";
@@ -98,9 +98,47 @@ const feedbackFormCallback = async ({
       attachments,
     });
 
+    const pageUrl = (page as { url: string }).url;
+    const submitterId = body.user.id;
+
+    const fields = [
+      `*Name:* ${name}`,
+      `*Type:* ${type}`,
+      `*Source:* ${source}`,
+      `*Submitted By:* <@${submitterId}>`,
+      `*Notion:* <${pageUrl}|View in Notion>`,
+    ];
+    if (customer) fields.push(`*Customer:* ${customer}`);
+    if (description) fields.push(`*Description:* ${description}`);
+    if (tags.length > 0) fields.push(`*Tags:* ${tags.join(", ")}`);
+
+    const notificationChannel = process.env.FEEDBACK_CHANNEL_ID;
+    if (notificationChannel) {
+      await client.chat.postMessage({
+        channel: notificationChannel,
+        text: `New feedback: ${name}`,
+        blocks: [
+          {
+            type: "header",
+            text: {
+              type: "plain_text",
+              text: "New Feedback",
+            },
+          },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: fields.join("\n"),
+            },
+          },
+        ],
+      });
+    }
+
     await client.chat.postMessage({
-      channel: body.user.id,
-      text: `Feedback saved: ${(page as { url: string }).url}`,
+      channel: submitterId,
+      text: `Feedback saved: ${pageUrl}`,
     });
   } catch (error) {
     logger.error("Feedback form submission failed:", error);

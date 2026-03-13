@@ -5,6 +5,8 @@ import { uploadFileToNotion } from "~/lib/notion/file-upload";
 import { findNotionUser } from "~/lib/notion/user-map";
 import { downloadSlackFile, getSlackFileInfo } from "~/lib/slack/files";
 
+export const EXPENSE_CLAIM_APPROVAL_ACTION = "expense_claim_approval";
+
 async function resolveNotionUserId(
   client: AllMiddlewareArgs["client"],
   slackUserId: string,
@@ -37,11 +39,23 @@ const expenseClaimFormCallback = async ({
     const amount = Number.parseFloat(values.amount.value.value ?? "0");
     const currency = values.currency.value.selected_option?.value ?? "";
     const expenseType = values.expense_type.value.selected_option?.value ?? "";
-    const paymentMethod =
-      values.payment_method.value.selected_option?.value ?? "";
-    const approverSlackId = values.approver.value.selected_user;
-    const payerSlackId = values.payer.value.selected_user;
-    const notes = values.notes.value.value ?? "";
+
+    let approverSlackId: string | null = null;
+    const approverEmail = process.env.EXPENSE_CLAIM_APPROVER_EMAIL;
+    if (approverEmail) {
+      try {
+        const lookupResult = await client.users.lookupByEmail({
+          email: approverEmail,
+        });
+        approverSlackId = lookupResult.user?.id ?? null;
+      } catch (error) {
+        console.warn(
+          "Failed to lookup approver by email:",
+          approverEmail,
+          error,
+        );
+      }
+    }
 
     // Handle file attachments: Slack → download → Notion upload
     const invoiceAttachments: ExpenseClaimAttachment[] = [];
@@ -81,29 +95,124 @@ const expenseClaimFormCallback = async ({
       approverNotionUserId = await resolveNotionUserId(client, approverSlackId);
     }
 
-    let payerNotionUserId: string | null = null;
-    if (payerSlackId) {
-      payerNotionUserId = await resolveNotionUserId(client, payerSlackId);
-    }
-
     const page = await createExpenseClaim({
       claimTitle,
       claimDescription,
       amount,
       currency,
       expenseType,
-      paymentMethod,
+      paymentMethod: "",
       approverNotionUserId,
-      payerNotionUserId,
+      payerNotionUserId: null,
       submittedByNotionUserId,
-      notes,
+      notes: "",
       invoiceAttachments,
     });
 
+    const pageUrl = (page as { url: string }).url;
+    const submitterId = body.user.id;
+
+    const fields = [
+      `*Claim Title:* ${claimTitle}`,
+      `*Amount:* ${amount} ${currency}`,
+      `*Expense Type:* ${expenseType}`,
+      `*Submitted By:* <@${submitterId}>`,
+    ];
+    fields.push(`*Notion:* <${pageUrl}|View in Notion>`);
+    if (claimDescription) fields.push(`*Description:* ${claimDescription}`);
+
+    const notificationChannel = process.env.EXPENSE_CLAIM_CHANNEL_ID;
+    if (notificationChannel) {
+      await client.chat.postMessage({
+        channel: notificationChannel,
+        text: `New expense claim: ${claimTitle}`,
+        blocks: [
+          {
+            type: "header",
+            text: {
+              type: "plain_text",
+              text: "New Expense Claim",
+            },
+          },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `${fields.join("\n")}`,
+            },
+          },
+        ],
+      });
+    }
+
     await client.chat.postMessage({
-      channel: body.user.id,
-      text: `Expense claim saved: ${(page as { url: string }).url}`,
+      channel: submitterId,
+      text: `Expense claim saved: ${pageUrl}`,
     });
+
+    const pageId = (page as { id: string }).id;
+    const approvalPayload = JSON.stringify({
+      pageId,
+      pageUrl,
+      claimTitle,
+      amount,
+      currency,
+      expenseType,
+      submitterId,
+      approved: true,
+    });
+    const rejectPayload = JSON.stringify({
+      pageId,
+      pageUrl,
+      claimTitle,
+      amount,
+      currency,
+      expenseType,
+      submitterId,
+      approved: false,
+    });
+
+    if (approverSlackId) {
+      await client.chat.postMessage({
+        channel: approverSlackId,
+        text: `Expense claim approval request: ${claimTitle}`,
+        blocks: [
+          {
+            type: "header",
+            text: {
+              type: "plain_text",
+              text: "Expense Claim Approval Request",
+            },
+          },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: fields.join("\n"),
+            },
+          },
+          {
+            type: "actions",
+            elements: [
+              {
+                type: "button",
+                text: { type: "plain_text", text: "Approve", emoji: true },
+                style: "primary",
+                action_id: EXPENSE_CLAIM_APPROVAL_ACTION,
+                value: approvalPayload,
+              },
+              {
+                type: "button",
+                text: { type: "plain_text", text: "Reject", emoji: true },
+                style: "danger",
+                action_id: `${EXPENSE_CLAIM_APPROVAL_ACTION}_reject`,
+                value: rejectPayload,
+              },
+            ],
+          },
+        ],
+      });
+    }
   } catch (error) {
     logger.error("Expense claim form submission failed:", error);
     try {

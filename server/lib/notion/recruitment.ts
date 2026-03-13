@@ -32,9 +32,6 @@ export async function createCandidate(data: RecruitmentData) {
     "Position Applied": {
       select: { name: data.positionApplied },
     },
-    "Current Status": {
-      status: { name: data.currentStatus },
-    },
     "Resume Source": {
       select: { name: data.resumeSource },
     },
@@ -64,14 +61,14 @@ export async function createCandidate(data: RecruitmentData) {
     };
   }
 
-    if (data.resumeLink) {
+  if (data.resumeLink) {
     properties["Resume Link"] = {
       url: data.resumeLink,
     };
   }
 
   if (data.resumeAttachments.length > 0) {
-    properties['Resume Attachment'] = {
+    properties["Resume Attachment"] = {
       files: data.resumeAttachments.map((att) => ({
         type: "file_upload" as const,
         file_upload: { id: att.fileUploadId },
