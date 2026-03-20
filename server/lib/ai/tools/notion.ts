@@ -365,8 +365,106 @@ const queryPendingApprovals = tool({
   },
 });
 
+const submitExpenseClaim = tool({
+  description:
+    "Submit an expense claim (reimbursement request) to Notion and send it for approval. Use this when the user wants to submit an expense or reimbursement. You MUST extract structured fields from the user's natural language and present them for confirmation BEFORE calling this tool. Only call this tool after the user confirms. After submission, the claim is sent to the approvals channel — the user will be notified via DM when it's approved or rejected.",
+  inputSchema: z.object({
+    claimTitle: z
+      .string()
+      .describe("Short title for the expense, e.g. 'Airport taxi 03/15'"),
+    claimDescription: z
+      .string()
+      .describe("Detailed description of the expense"),
+    amount: z.number().describe("Expense amount as a number"),
+    currency: z
+      .enum(["CNY", "USD", "AED"])
+      .describe("Currency code: CNY, USD, or AED"),
+    expenseType: z
+      .enum([
+        "Travel",
+        "Office Supplies",
+        "Entertainment",
+        "Training",
+        "Meals",
+        "Equipment",
+        "Other",
+      ])
+      .describe("Category of the expense"),
+  }),
+  execute: async (
+    { claimTitle, claimDescription, amount, currency, expenseType },
+    { experimental_context },
+  ) => {
+    "use step";
+
+    const { createExpenseClaim } = await import("~/lib/notion/expense-claim");
+    const { WebClient } = await import("@slack/web-api");
+    const { expenseClaimApprovalBlocks } = await import("~/lib/slack/blocks");
+
+    const ctx = experimental_context as SlackAgentContextInput;
+
+    try {
+      const submittedByNotionUserId = await resolveNotionUserId(
+        ctx.token,
+        ctx.user_id,
+      );
+
+      const page = await createExpenseClaim({
+        claimTitle,
+        claimDescription,
+        amount,
+        currency,
+        expenseType,
+        paymentMethod: "",
+        approverNotionUserId: null,
+        payerNotionUserId: null,
+        submittedByNotionUserId,
+        notes: "",
+        invoiceAttachments: [],
+      });
+
+      const pageId = (page as { id: string }).id;
+      const pageUrl = (page as { url: string }).url;
+
+      const approvalsChannel = process.env.SLACK_APPROVALS_CHANNEL_ID;
+      if (approvalsChannel) {
+        const client = new WebClient(ctx.token);
+        await client.chat.postMessage({
+          channel: approvalsChannel,
+          text: `Expense claim approval request: ${claimTitle}`,
+          blocks: expenseClaimApprovalBlocks({
+            pageId,
+            pageUrl,
+            claimTitle,
+            amount,
+            currency,
+            expenseType,
+            submitterId: ctx.user_id,
+          }),
+        });
+      }
+
+      return {
+        success: true,
+        message: approvalsChannel
+          ? `Expense claim "${claimTitle}" (${amount} ${currency}) has been saved to Notion and sent for approval.`
+          : `Expense claim "${claimTitle}" (${amount} ${currency}) has been saved to Notion. Note: no approvals channel is configured.`,
+        pageUrl,
+      };
+    } catch (error) {
+      console.error("Failed to submit expense claim:", error);
+      return {
+        success: false,
+        message: "Failed to submit expense claim",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  },
+});
+
 export const notionTools = {
   submitFeedback,
+  submitExpenseClaim,
   queryMyTasks,
   queryProjectStatus,
   queryPendingApprovals,

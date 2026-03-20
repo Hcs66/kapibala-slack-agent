@@ -24,6 +24,15 @@ vi.mock("~/lib/notion/query", () => ({
   queryRecruitment: vi.fn(),
 }));
 
+vi.mock("~/lib/notion/expense-claim", () => ({
+  createExpenseClaim: vi.fn(),
+}));
+
+vi.mock("~/lib/slack/blocks", () => ({
+  expenseClaimApprovalBlocks: vi.fn().mockReturnValue([]),
+}));
+
+import { createExpenseClaim } from "~/lib/notion/expense-claim";
 import { createFeedback } from "~/lib/notion/feedback";
 import {
   queryExpenseClaims,
@@ -38,6 +47,7 @@ const mockFindNotionUser = vi.mocked(findNotionUser);
 const mockQueryFeedback = vi.mocked(queryFeedback);
 const mockQueryExpenseClaims = vi.mocked(queryExpenseClaims);
 const mockQueryRecruitment = vi.mocked(queryRecruitment);
+const mockCreateExpenseClaim = vi.mocked(createExpenseClaim);
 
 const baseContext = {
   channel_id: "C123",
@@ -453,6 +463,101 @@ describe("queryPendingApprovals tool", () => {
     expect(result).toMatchObject({
       success: false,
       error: "DB error",
+    });
+  });
+});
+
+function executeSubmitExpenseClaim(
+  params: Record<string, unknown>,
+  ctx = baseContext,
+) {
+  const toolDef = notionTools.submitExpenseClaim;
+  return (
+    toolDef as unknown as { execute: (...args: unknown[]) => unknown }
+  ).execute(params, {
+    experimental_context: ctx,
+  });
+}
+
+const expenseClaimParams = {
+  claimTitle: "Airport taxi",
+  claimDescription: "Taxi from airport to office",
+  amount: 150,
+  currency: "AED",
+  expenseType: "Travel",
+};
+
+describe("submitExpenseClaim tool", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.SLACK_APPROVALS_CHANNEL_ID = "C-APPROVALS";
+  });
+
+  it("creates claim and sends approval request to channel", async () => {
+    mockUsersInfo.mockResolvedValue({
+      user: { profile: { email: "user@example.com" } },
+    });
+    mockFindNotionUser.mockResolvedValue("notion-user-111");
+    mockCreateExpenseClaim.mockResolvedValue({
+      id: "page-ec-1",
+      url: "https://notion.so/ec-1",
+    } as ReturnType<typeof createExpenseClaim> extends Promise<infer T>
+      ? T
+      : never);
+
+    const result = await executeSubmitExpenseClaim(expenseClaimParams);
+
+    expect(mockCreateExpenseClaim).toHaveBeenCalledWith(
+      expect.objectContaining({
+        claimTitle: "Airport taxi",
+        amount: 150,
+        currency: "AED",
+        expenseType: "Travel",
+        submittedByNotionUserId: "notion-user-111",
+      }),
+    );
+    expect(mockChatPostMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "C-APPROVALS",
+      }),
+    );
+    expect(result).toMatchObject({
+      success: true,
+      message: expect.stringContaining("sent for approval"),
+      pageUrl: "https://notion.so/ec-1",
+    });
+  });
+
+  it("saves claim but notes missing channel when not configured", async () => {
+    delete process.env.SLACK_APPROVALS_CHANNEL_ID;
+    mockUsersInfo.mockResolvedValue({ user: { profile: {} } });
+    mockCreateExpenseClaim.mockResolvedValue({
+      id: "page-ec-3",
+      url: "https://notion.so/ec-3",
+    } as ReturnType<typeof createExpenseClaim> extends Promise<infer T>
+      ? T
+      : never);
+
+    const result = await executeSubmitExpenseClaim(expenseClaimParams);
+
+    expect(mockCreateExpenseClaim).toHaveBeenCalled();
+    expect(mockChatPostMessage).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      success: true,
+      message: expect.stringContaining("no approvals channel"),
+      pageUrl: "https://notion.so/ec-3",
+    });
+  });
+
+  it("returns error when Notion create fails", async () => {
+    mockUsersInfo.mockResolvedValue({ user: { profile: {} } });
+    mockCreateExpenseClaim.mockRejectedValue(new Error("Notion down"));
+
+    const result = await executeSubmitExpenseClaim(expenseClaimParams);
+
+    expect(result).toMatchObject({
+      success: false,
+      error: "Notion down",
     });
   });
 });

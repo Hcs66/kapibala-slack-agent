@@ -97,3 +97,72 @@ export const channelJoinApprovalBlocks = ({
 
   return [sectionBlock, actionsBlock];
 };
+
+export const EXPENSE_CLAIM_AGENT_APPROVAL_ACTION =
+  "expense_claim_agent_approval";
+
+export const expenseClaimApprovalBlocks = ({
+  pageId,
+  pageUrl,
+  claimTitle,
+  amount,
+  currency,
+  expenseType,
+  submitterId,
+}: {
+  pageId: string;
+  pageUrl: string;
+  claimTitle: string;
+  amount: number;
+  currency: string;
+  expenseType: string;
+  submitterId: string;
+}): KnownBlock[] => {
+  const fields = [
+    `*Claim Title:* ${claimTitle}`,
+    `*Amount:* ${amount} ${currency}`,
+    `*Expense Type:* ${expenseType}`,
+    `*Submitted By:* <@${submitterId}>`,
+    `*Notion:* <${pageUrl}|View in Notion>`,
+  ];
+
+  const payload = {
+    pageId,
+    pageUrl,
+    claimTitle,
+    amount,
+    currency,
+    expenseType,
+    submitterId,
+  };
+
+  const sectionBlock: SectionBlock = {
+    type: "section",
+    text: {
+      type: "mrkdwn",
+      text: `💰 *Expense Claim Approval Request*\n\n${fields.join("\n")}`,
+    },
+  };
+
+  const actionsBlock: ActionsBlock = {
+    type: "actions",
+    elements: [
+      {
+        type: "button",
+        text: { type: "plain_text", text: "Approve", emoji: true },
+        style: "primary",
+        action_id: EXPENSE_CLAIM_AGENT_APPROVAL_ACTION,
+        value: JSON.stringify({ ...payload, approved: true }),
+      },
+      {
+        type: "button",
+        text: { type: "plain_text", text: "Reject", emoji: true },
+        style: "danger",
+        action_id: `${EXPENSE_CLAIM_AGENT_APPROVAL_ACTION}_reject`,
+        value: JSON.stringify({ ...payload, approved: false }),
+      },
+    ],
+  };
+
+  return [sectionBlock, actionsBlock];
+};
