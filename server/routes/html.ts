@@ -8,6 +8,10 @@ export const html = `<!DOCTYPE html>
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Repository Documentation</title>
         <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+        <script>
+            window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+        </script>
+        <script defer src="/_vercel/insights/script.js"></script>
         <style>
             * {
                 margin: 0;
