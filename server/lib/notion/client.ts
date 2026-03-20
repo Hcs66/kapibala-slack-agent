@@ -1,7 +1,12 @@
 import { Client } from "@notionhq/client";
 
-const notion = new Client({
-  auth: process.env.NOTION_KEY,
-});
+let _notion: Client | null = null;
 
-export { notion };
+export function getNotionClient(): Client {
+  if (!_notion) {
+    _notion = new Client({
+      auth: process.env.NOTION_KEY,
+    });
+  }
+  return _notion;
+}

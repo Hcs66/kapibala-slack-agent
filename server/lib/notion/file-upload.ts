@@ -1,5 +1,3 @@
-import { notion } from "./client";
-
 export interface NotionFileUploadResult {
   fileUploadId: string;
   filename: string;
@@ -10,6 +8,8 @@ export async function uploadFileToNotion(
   filename: string,
   contentType: string,
 ): Promise<NotionFileUploadResult> {
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
   const fileUpload = await notion.fileUploads.create({
     mode: "single_part",
     filename,

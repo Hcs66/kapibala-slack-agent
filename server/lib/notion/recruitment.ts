@@ -1,5 +1,4 @@
 import type { CreatePageParameters } from "@notionhq/client/build/src/api-endpoints";
-import { notion } from "./client";
 
 export interface RecruitmentAttachment {
   fileUploadId: string;
@@ -77,6 +76,8 @@ export async function createCandidate(data: RecruitmentData) {
     };
   }
 
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
   const page = await notion.pages.create({
     parent: {
       database_id: databaseId,

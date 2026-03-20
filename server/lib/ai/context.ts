@@ -14,4 +14,6 @@ export type SlackAgentContextInput = {
   bot_id?: string;
   /** The Slack bot token for creating the client */
   token: string;
+  /** The Slack user ID of the person interacting with the agent */
+  user_id: string;
 };
