@@ -1,6 +1,76 @@
 import { tool } from "ai";
 import { z } from "zod";
 import type { SlackAgentContextInput } from "~/lib/ai/context";
+import type {
+  ExpenseClaimRecord,
+  FeedbackRecord,
+  RecruitmentRecord,
+} from "~/lib/notion/query";
+
+async function resolveNotionUserId(
+  token: string,
+  slackUserId: string,
+): Promise<string | null> {
+  try {
+    const { WebClient } = await import("@slack/web-api");
+    const { findNotionUser } = await import("~/lib/notion/user-map");
+    const client = new WebClient(token);
+    const userInfo = await client.users.info({ user: slackUserId });
+    const email = userInfo.user?.profile?.email;
+    if (email) {
+      return await findNotionUser(email);
+    }
+  } catch (error) {
+    console.warn("Failed to resolve Notion user:", error);
+  }
+  return null;
+}
+
+function formatFeedbackList(items: FeedbackRecord[]): string {
+  if (items.length === 0) return "No feedback items found.";
+  return items
+    .map((f, i) => {
+      const parts = [`${i + 1}. *${f.name}*`];
+      if (f.type) parts.push(`Type: ${f.type}`);
+      if (f.priority) parts.push(`Priority: ${f.priority}`);
+      if (f.source) parts.push(`Source: ${f.source}`);
+      if (f.dueDate) parts.push(`Due: ${f.dueDate}`);
+      if (f.tags.length > 0) parts.push(`Tags: ${f.tags.join(", ")}`);
+      parts.push(`<${f.url}|View in Notion>`);
+      return parts.join(" | ");
+    })
+    .join("\n");
+}
+
+function formatExpenseClaimList(items: ExpenseClaimRecord[]): string {
+  if (items.length === 0) return "No expense claims found.";
+  return items
+    .map((e, i) => {
+      const parts = [`${i + 1}. *${e.claimTitle}*`];
+      if (e.amount != null && e.currency)
+        parts.push(`${e.amount} ${e.currency}`);
+      if (e.expenseType) parts.push(`Type: ${e.expenseType}`);
+      if (e.approvalStatus) parts.push(`Status: ${e.approvalStatus}`);
+      if (e.submissionDate) parts.push(`Submitted: ${e.submissionDate}`);
+      parts.push(`<${e.url}|View in Notion>`);
+      return parts.join(" | ");
+    })
+    .join("\n");
+}
+
+function formatRecruitmentList(items: RecruitmentRecord[]): string {
+  if (items.length === 0) return "No candidates found.";
+  return items
+    .map((r, i) => {
+      const parts = [`${i + 1}. *${r.candidateName}*`];
+      if (r.positionApplied) parts.push(`Position: ${r.positionApplied}`);
+      if (r.currentStatus) parts.push(`Status: ${r.currentStatus}`);
+      if (r.interviewTime) parts.push(`Interview: ${r.interviewTime}`);
+      parts.push(`<${r.url}|View in Notion>`);
+      return parts.join(" | ");
+    })
+    .join("\n");
+}
 
 const submitFeedback = tool({
   description:
@@ -37,23 +107,15 @@ const submitFeedback = tool({
     "use step";
 
     const { createFeedback } = await import("~/lib/notion/feedback");
-    const { findNotionUser } = await import("~/lib/notion/user-map");
     const { WebClient } = await import("@slack/web-api");
 
     const ctx = experimental_context as SlackAgentContextInput;
 
     try {
-      let createdByNotionUserId: string | null = null;
-      try {
-        const client = new WebClient(ctx.token);
-        const userInfo = await client.users.info({ user: ctx.user_id });
-        const email = userInfo.user?.profile?.email;
-        if (email) {
-          createdByNotionUserId = await findNotionUser(email);
-        }
-      } catch (userError) {
-        console.warn("Failed to resolve Notion user:", userError);
-      }
+      const createdByNotionUserId = await resolveNotionUserId(
+        ctx.token,
+        ctx.user_id,
+      );
 
       const page = await createFeedback({
         name,
@@ -119,6 +181,193 @@ const submitFeedback = tool({
   },
 });
 
+const queryMyTasks = tool({
+  description:
+    "Query the current user's assigned feedback items (bugs, feature requests, tasks) from Notion. Use this when the user asks about their tasks, assignments, or work items. Examples: 'what are my tasks', 'show my assignments', 'what's on my plate'.",
+  inputSchema: z.object({
+    type: z
+      .string()
+      .optional()
+      .describe("Filter by feedback type, e.g. Bug, Feature Request"),
+    priority: z
+      .string()
+      .optional()
+      .describe("Filter by priority, e.g. P0, P1, P2, P3"),
+  }),
+  execute: async ({ type, priority }, { experimental_context }) => {
+    "use step";
+
+    const { queryFeedback } = await import("~/lib/notion/query");
+    const ctx = experimental_context as SlackAgentContextInput;
+
+    try {
+      const notionUserId = await resolveNotionUserId(ctx.token, ctx.user_id);
+      if (!notionUserId) {
+        return {
+          success: false,
+          message:
+            "Could not find your Notion account. Make sure your Slack email matches your Notion email.",
+        };
+      }
+
+      const items = await queryFeedback({
+        assigneeNotionUserId: notionUserId,
+        type: type || undefined,
+        priority: priority || undefined,
+      });
+
+      return {
+        success: true,
+        count: items.length,
+        message:
+          items.length > 0
+            ? `Found ${items.length} task(s) assigned to you.`
+            : "You have no tasks assigned.",
+        formatted: formatFeedbackList(items),
+        items,
+      };
+    } catch (error) {
+      console.error("Failed to query tasks:", error);
+      return {
+        success: false,
+        message: "Failed to query tasks from Notion",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  },
+});
+
+const queryProjectStatus = tool({
+  description:
+    "Query project status from Notion databases. Use this when the user asks about project progress, feedback stats, recruitment pipeline, or overall status. Examples: 'how is project X going', 'show me all P0 bugs', 'recruitment pipeline status', 'how many open bugs do we have'.",
+  inputSchema: z.object({
+    database: z
+      .enum(["feedback", "expense_claims", "recruitment"])
+      .describe(
+        "Which database to query: feedback (bugs/features/tasks), expense_claims (reimbursements), recruitment (candidates)",
+      ),
+    filters: z
+      .object({
+        type: z.string().optional().describe("Feedback type filter"),
+        priority: z.string().optional().describe("Priority filter"),
+        source: z.string().optional().describe("Source filter"),
+        status: z.string().optional().describe("Status/approval status filter"),
+        position: z
+          .string()
+          .optional()
+          .describe("Position filter (recruitment)"),
+      })
+      .optional()
+      .describe("Optional filters to narrow results"),
+  }),
+  execute: async ({ database, filters }, { experimental_context: _ctx }) => {
+    "use step";
+
+    const { queryFeedback, queryExpenseClaims, queryRecruitment } =
+      await import("~/lib/notion/query");
+
+    try {
+      if (database === "feedback") {
+        const items = await queryFeedback({
+          type: filters?.type || undefined,
+          priority: filters?.priority || undefined,
+          source: filters?.source || undefined,
+        });
+        return {
+          success: true,
+          database: "feedback",
+          count: items.length,
+          formatted: formatFeedbackList(items),
+          items,
+        };
+      }
+
+      if (database === "expense_claims") {
+        const items = await queryExpenseClaims({
+          approvalStatus: filters?.status || undefined,
+        });
+        return {
+          success: true,
+          database: "expense_claims",
+          count: items.length,
+          formatted: formatExpenseClaimList(items),
+          items,
+        };
+      }
+
+      if (database === "recruitment") {
+        const items = await queryRecruitment({
+          positionApplied: filters?.position || undefined,
+          currentStatus: filters?.status || undefined,
+        });
+        return {
+          success: true,
+          database: "recruitment",
+          count: items.length,
+          formatted: formatRecruitmentList(items),
+          items,
+        };
+      }
+
+      return { success: false, message: `Unknown database: ${database}` };
+    } catch (error) {
+      console.error("Failed to query project status:", error);
+      return {
+        success: false,
+        message: "Failed to query project status from Notion",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  },
+});
+
+const queryPendingApprovals = tool({
+  description:
+    "Query pending expense claim approvals from Notion. Use this when the user asks about pending approvals, unprocessed reimbursements, or expense claims waiting for review. Examples: 'any pending approvals', 'how many expense claims need review', 'show me unapproved reimbursements'.",
+  inputSchema: z.object({}),
+  execute: async (_input, { experimental_context }) => {
+    "use step";
+
+    const { queryExpenseClaims } = await import("~/lib/notion/query");
+    const _ctx = experimental_context as SlackAgentContextInput;
+
+    try {
+      const allClaims = await queryExpenseClaims({});
+      const pending = allClaims.filter(
+        (c) => !c.approvalStatus || c.approvalStatus === "Not started",
+      );
+      const approved = allClaims.filter((c) => c.approvalStatus === "Approved");
+      const rejected = allClaims.filter((c) => c.approvalStatus === "Rejected");
+
+      return {
+        success: true,
+        summary: {
+          total: allClaims.length,
+          pending: pending.length,
+          approved: approved.length,
+          rejected: rejected.length,
+        },
+        message:
+          pending.length > 0
+            ? `${pending.length} expense claim(s) pending approval.`
+            : "No pending expense claims.",
+        formatted: formatExpenseClaimList(pending),
+        pendingItems: pending,
+      };
+    } catch (error) {
+      console.error("Failed to query pending approvals:", error);
+      return {
+        success: false,
+        message: "Failed to query pending approvals from Notion",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  },
+});
+
 export const notionTools = {
   submitFeedback,
+  queryMyTasks,
+  queryProjectStatus,
+  queryPendingApprovals,
 };

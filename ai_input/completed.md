@@ -80,4 +80,24 @@
 先阅读优化方案  update_v1(ai_input/update_v1.md)，做一个优化计划
 ---
 
+开始P0-1:
 
+## 说明
+
+- 本项目基于 vercel 和 slack 的相关框架，请先通过README.md了解
+ - 了解 Features 和 Contains the AI agent implementation 部分
+- 我使用 Bring Your Own Key (BYOK) 访问 LLM
+ - 参考官方文档：https://vercel.com/docs/ai-gateway/authentication-and-byok/byok
+ - 我使用minimax模型，参考官方文档：https://ai-sdk.dev/providers/community-providers/minimax
+
+---
+
+优化 query (server/lib/notion/query.ts)
+
+## 说明
+
+- querynotion.dataSources.query 的参数 data_source_id 应改为datasource id 而不是 database id, 已在env中添加对应datasource id
+    - NOTION_FEEDBACK_DATASOURCE_ID
+    - NOTION_EXPENSE_CLAIM_DATASOURCE_ID
+    - NOTION_RECRUITMENT_DATASOURCE_ID
+- 再次查看 notion 官方 datasource query文档 看看有没有优化空间
