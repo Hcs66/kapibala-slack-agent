@@ -101,3 +101,32 @@
     - NOTION_EXPENSE_CLAIM_DATASOURCE_ID
     - NOTION_RECRUITMENT_DATASOURCE_ID
 - 再次查看 notion 官方 datasource query文档 看看有没有优化空间
+
+---
+继续完成任务 `P0-3: 报销对话式 + 审批`：
+
+## 说明
+- 根据 plan_v1（ai_input/resources/docs/plan_v1.md）继续完成任务： `P0-3: 报销对话式 + 审批`
+- `P0-1` 和 `P0-2` 已完成
+
+---
+
+测试 报销流程（expense_claim）时遇到问题：
+
+## 说明
+
+- 测试请求：我要报销上周打车 150 AED
+- 返回需要确认提交的报销信息，但是确认后没有后续动作，日志显示代码一直停留在：
+
+```text
+
+[DEBUG]  web-api:WebClient:1 apiCall('conversations.replies') end
+[DEBUG]   [@vercel/slack-bolt] App initialized in VercelReceiver
+[DEBUG]   [@vercel/slack-bolt] VercelReceiver started
+[DEBUG]   [@vercel/slack-bolt] ack() call begins (body: undefined)
+
+```
+
+- 请使用 `slack-agent` 技能重新检查相关代码，特别是HITL逻辑是否有问题
+
+---

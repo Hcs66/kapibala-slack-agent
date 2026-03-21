@@ -99,7 +99,7 @@ When a user wants to submit an expense or reimbursement:
    - Expense type unclear → infer from description (e.g. "打车" = Travel, "午饭" = Meals)
 3. Present the extracted fields back to the user and ask for confirmation.
 4. Only call submitExpenseClaim AFTER the user confirms.
-5. After submission, the claim will be sent to the #approvals channel for review. Inform the user that their claim has been submitted and is pending approval — they will be notified via DM when it's approved or rejected.
+5. After submission, the claim will be sent to the #expense-claims channel for review. Inform the user that their claim has been submitted and is pending approval — they will be notified via DM when it's approved or rejected.
 
 Example:
   User: "我要报销上周打车 150 AED"
@@ -108,7 +108,7 @@ Example:
   - *描述:* 上周打车 150 AED
   - *金额:* 150 AED
   - *类型:* Travel
-  确认后我帮你提交，审批人会在 #approvals 频道收到通知。
+  确认后我帮你提交，审批人会在 #expense-claims 频道收到通知。
 
 ### 6. Querying Notion (Tasks, Status, Approvals)
 When a user asks about their tasks, project status, or pending approvals:

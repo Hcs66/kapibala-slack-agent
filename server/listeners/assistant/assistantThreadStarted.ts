@@ -36,16 +36,16 @@ export const assistantThreadStarted: AssistantThreadStartedMiddleware = async ({
      * @see {@link https://docs.slack.dev/reference/methods/assistant.threads.setSuggestedPrompts}
      */
     if (!context.channel_id) {
-      await setSuggestedPrompts({
-        title: "What can I help you with?",
-        prompts: [
-          {
-            title: "Generate ideas",
-            message:
-              "Pretend you are a marketing associate and you need new ideas for an enterprise productivity feature. Generate 10 ideas for a new feature launch.",
-          },
-        ],
-      });
+      // await setSuggestedPrompts({
+      //   title: "What can I help you with?",
+      //   prompts: [
+      //     {
+      //       title: "Generate ideas",
+      //       message:
+      //         "Pretend you are a marketing associate and you need new ideas for an enterprise productivity feature. Generate 10 ideas for a new feature launch.",
+      //     },
+      //   ],
+      // });
     }
 
     /**
@@ -54,16 +54,16 @@ export const assistantThreadStarted: AssistantThreadStartedMiddleware = async ({
      * that only make sense to appear in that context.
      */
     if (context.channel_id) {
-      await setSuggestedPrompts({
-        title: "Perform an action based on the channel",
-        prompts: [
-          {
-            title: "Summarize channel",
-            message:
-              "Assistant, please summarize the activity in this channel!",
-          },
-        ],
-      });
+      // await setSuggestedPrompts({
+      //   title: "Perform an action based on the channel",
+      //   prompts: [
+      //     {
+      //       title: "Summarize channel",
+      //       message:
+      //         "Assistant, please summarize the activity in this channel!",
+      //     },
+      //   ],
+      // });
     }
   } catch (e) {
     logger.error(e);
