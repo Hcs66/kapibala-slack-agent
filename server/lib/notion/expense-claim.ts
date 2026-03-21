@@ -1,4 +1,7 @@
-import type { CreatePageParameters } from "@notionhq/client/build/src/api-endpoints";
+import type {
+  CreatePageParameters,
+  UpdatePageParameters,
+} from "@notionhq/client/build/src/api-endpoints";
 
 export interface ExpenseClaimAttachment {
   fileUploadId: string;
@@ -77,16 +80,26 @@ export async function createExpenseClaim(data: ExpenseClaimData) {
 export async function updateExpenseClaimStatus(
   pageId: string,
   status: "Approved" | "Rejected",
+  approverNotionUserId?: string | null,
 ) {
   const { getNotionClient } = await import("~/lib/notion/client");
   const notion = getNotionClient();
+
+  const properties: UpdatePageParameters["properties"] = {
+    "Approval Status": {
+      status: { name: status },
+    },
+  };
+
+  if (status === "Approved" && approverNotionUserId) {
+    properties.Approver = {
+      people: [{ id: approverNotionUserId }],
+    };
+  }
+
   await notion.pages.update({
     page_id: pageId,
-    properties: {
-      "Approval Status": {
-        status: { name: status },
-      },
-    },
+    properties,
   });
 }
 
