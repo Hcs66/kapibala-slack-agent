@@ -462,9 +462,129 @@ const submitExpenseClaim = tool({
   },
 });
 
+const submitCandidate = tool({
+  description:
+    "Submit a candidate entry to the recruitment database in Notion. Use this when the user mentions a candidate, referral, or someone applying for a position. You MUST extract structured fields from the user's natural language and present them for confirmation BEFORE calling this tool. Only call this tool after the user confirms the extracted information.",
+  inputSchema: z.object({
+    candidateName: z.string().describe("Full name of the candidate"),
+    positionApplied: z
+      .enum([
+        "AI Post-Training Engineer",
+        "AI Product Engineer / Full-Stack",
+        "International Business Development",
+        "Software Engineer",
+        "Product Manager",
+        "UX Designer",
+        "HR Specialist",
+      ])
+      .describe("Position the candidate is applying for"),
+    resumeSource: z
+      .enum(["LinkedIn", "Xiaohongshu", "Email", "Liepin", "Other"])
+      .describe("Where the candidate's resume was sourced from"),
+    phone: z.string().optional().describe("Candidate's phone number"),
+    email: z.string().optional().describe("Candidate's email address"),
+    interviewTime: z
+      .string()
+      .optional()
+      .describe("Interview date/time in ISO 8601 format (e.g. 2026-03-25)"),
+    zoomMeetingLink: z
+      .string()
+      .optional()
+      .describe("Zoom meeting link for the interview"),
+    resumeLink: z
+      .string()
+      .optional()
+      .describe("URL link to the candidate's resume"),
+  }),
+  execute: async (
+    {
+      candidateName,
+      positionApplied,
+      resumeSource,
+      phone,
+      email,
+      interviewTime,
+      zoomMeetingLink,
+      resumeLink,
+    },
+    { experimental_context },
+  ) => {
+    "use step";
+
+    const { createCandidate } = await import("~/lib/notion/recruitment");
+    const { WebClient } = await import("@slack/web-api");
+
+    const ctx = experimental_context as SlackAgentContextInput;
+
+    try {
+      const page = await createCandidate({
+        candidateName,
+        positionApplied,
+        currentStatus: "",
+        resumeSource,
+        phone: phone ?? "",
+        email: email ?? "",
+        interviewTime: interviewTime ?? null,
+        zoomMeetingLink: zoomMeetingLink ?? "",
+        resumeLink: resumeLink ?? "",
+        resumeAttachments: [],
+      });
+
+      const pageUrl = (page as { url: string }).url;
+
+      const notificationChannel = process.env.RECRUITMENT_CHANNEL_ID;
+      if (notificationChannel) {
+        const client = new WebClient(ctx.token);
+        const fields = [
+          `*Candidate Name:* ${candidateName}`,
+          `*Position:* ${positionApplied}`,
+          `*Source:* ${resumeSource}`,
+          `*Submitted By:* <@${ctx.user_id}>`,
+          `*Notion:* <${pageUrl}|View in Notion>`,
+        ];
+        if (phone) fields.push(`*Phone:* ${phone}`);
+        if (email) fields.push(`*Email:* ${email}`);
+        if (interviewTime) fields.push(`*Interview Time:* ${interviewTime}`);
+        if (zoomMeetingLink)
+          fields.push(`*Zoom:* <${zoomMeetingLink}|Join Meeting>`);
+        if (resumeLink) fields.push(`*Resume:* <${resumeLink}|View Resume>`);
+
+        await client.chat.postMessage({
+          channel: notificationChannel,
+          text: `New candidate: ${candidateName}`,
+          blocks: [
+            {
+              type: "header",
+              text: { type: "plain_text", text: "New Candidate" },
+            },
+            {
+              type: "section",
+              text: { type: "mrkdwn", text: fields.join("\n") },
+            },
+          ],
+        });
+      }
+
+      return {
+        success: true,
+        message: `Candidate "${candidateName}" for ${positionApplied} has been saved to Notion.`,
+        pageUrl,
+      };
+    } catch (error) {
+      console.error("Failed to create candidate:", error);
+      return {
+        success: false,
+        message: "Failed to save candidate to Notion",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  },
+});
+
 export const notionTools = {
   submitFeedback,
   submitExpenseClaim,
+  submitCandidate,
   queryMyTasks,
   queryProjectStatus,
   queryPendingApprovals,

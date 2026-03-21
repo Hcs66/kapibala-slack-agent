@@ -28,6 +28,10 @@ vi.mock("~/lib/notion/expense-claim", () => ({
   createExpenseClaim: vi.fn(),
 }));
 
+vi.mock("~/lib/notion/recruitment", () => ({
+  createCandidate: vi.fn(),
+}));
+
 vi.mock("~/lib/slack/blocks", () => ({
   expenseClaimApprovalBlocks: vi.fn().mockReturnValue([]),
 }));
@@ -39,6 +43,7 @@ import {
   queryFeedback,
   queryRecruitment,
 } from "~/lib/notion/query";
+import { createCandidate } from "~/lib/notion/recruitment";
 import { findNotionUser } from "~/lib/notion/user-map";
 import { notionTools } from "./notion";
 
@@ -48,6 +53,7 @@ const mockQueryFeedback = vi.mocked(queryFeedback);
 const mockQueryExpenseClaims = vi.mocked(queryExpenseClaims);
 const mockQueryRecruitment = vi.mocked(queryRecruitment);
 const mockCreateExpenseClaim = vi.mocked(createExpenseClaim);
+const mockCreateCandidate = vi.mocked(createCandidate);
 
 const baseContext = {
   channel_id: "C123",
@@ -559,5 +565,156 @@ describe("submitExpenseClaim tool", () => {
       success: false,
       error: "Notion down",
     });
+  });
+});
+
+function executeSubmitCandidate(
+  params: Record<string, unknown>,
+  ctx = baseContext,
+) {
+  const toolDef = notionTools.submitCandidate;
+  return (
+    toolDef as unknown as { execute: (...args: unknown[]) => unknown }
+  ).execute(params, { experimental_context: ctx });
+}
+
+const candidateParams = {
+  candidateName: "Zhang San",
+  positionApplied: "Software Engineer",
+  resumeSource: "LinkedIn",
+  email: "zhangsan@example.com",
+};
+
+describe("submitCandidate tool", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.RECRUITMENT_CHANNEL_ID;
+  });
+
+  it("creates candidate in Notion and returns page URL", async () => {
+    mockCreateCandidate.mockResolvedValue({
+      url: "https://notion.so/candidate-1",
+    } as ReturnType<typeof createCandidate> extends Promise<infer T>
+      ? T
+      : never);
+
+    const result = await executeSubmitCandidate(candidateParams);
+
+    expect(mockCreateCandidate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        candidateName: "Zhang San",
+        positionApplied: "Software Engineer",
+        resumeSource: "LinkedIn",
+        email: "zhangsan@example.com",
+        phone: "",
+        currentStatus: "",
+        interviewTime: null,
+        zoomMeetingLink: "",
+        resumeLink: "",
+        resumeAttachments: [],
+      }),
+    );
+    expect(result).toMatchObject({
+      success: true,
+      pageUrl: "https://notion.so/candidate-1",
+    });
+  });
+
+  it("posts notification to recruitment channel when configured", async () => {
+    process.env.RECRUITMENT_CHANNEL_ID = "C-RECRUIT";
+    mockCreateCandidate.mockResolvedValue({
+      url: "https://notion.so/candidate-2",
+    } as ReturnType<typeof createCandidate> extends Promise<infer T>
+      ? T
+      : never);
+
+    await executeSubmitCandidate(candidateParams);
+
+    expect(mockChatPostMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "C-RECRUIT",
+        text: "New candidate: Zhang San",
+      }),
+    );
+  });
+
+  it("skips notification when RECRUITMENT_CHANNEL_ID is not set", async () => {
+    mockCreateCandidate.mockResolvedValue({
+      url: "https://notion.so/candidate-3",
+    } as ReturnType<typeof createCandidate> extends Promise<infer T>
+      ? T
+      : never);
+
+    await executeSubmitCandidate(candidateParams);
+
+    expect(mockChatPostMessage).not.toHaveBeenCalled();
+  });
+
+  it("returns error when Notion API fails", async () => {
+    mockCreateCandidate.mockRejectedValue(new Error("Notion API error"));
+
+    const result = await executeSubmitCandidate(candidateParams);
+
+    expect(result).toMatchObject({
+      success: false,
+      error: "Notion API error",
+    });
+  });
+
+  it("handles all optional fields", async () => {
+    mockCreateCandidate.mockResolvedValue({
+      url: "https://notion.so/candidate-4",
+    } as ReturnType<typeof createCandidate> extends Promise<infer T>
+      ? T
+      : never);
+
+    await executeSubmitCandidate({
+      candidateName: "Li Si",
+      positionApplied: "Product Manager",
+      resumeSource: "Email",
+      phone: "+86-13800138000",
+      email: "lisi@example.com",
+      interviewTime: "2026-03-25",
+      zoomMeetingLink: "https://zoom.us/j/123",
+      resumeLink: "https://example.com/resume.pdf",
+    });
+
+    expect(mockCreateCandidate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        candidateName: "Li Si",
+        positionApplied: "Product Manager",
+        resumeSource: "Email",
+        phone: "+86-13800138000",
+        email: "lisi@example.com",
+        interviewTime: "2026-03-25",
+        zoomMeetingLink: "https://zoom.us/j/123",
+        resumeLink: "https://example.com/resume.pdf",
+        resumeAttachments: [],
+      }),
+    );
+  });
+
+  it("includes optional fields in channel notification", async () => {
+    process.env.RECRUITMENT_CHANNEL_ID = "C-RECRUIT";
+    mockCreateCandidate.mockResolvedValue({
+      url: "https://notion.so/candidate-5",
+    } as ReturnType<typeof createCandidate> extends Promise<infer T>
+      ? T
+      : never);
+
+    await executeSubmitCandidate({
+      ...candidateParams,
+      phone: "+1-555-0100",
+      interviewTime: "2026-04-01",
+      zoomMeetingLink: "https://zoom.us/j/456",
+      resumeLink: "https://example.com/cv.pdf",
+    });
+
+    const callArgs = mockChatPostMessage.mock.calls[0][0];
+    const sectionText = callArgs.blocks[1].text.text;
+    expect(sectionText).toContain("+1-555-0100");
+    expect(sectionText).toContain("2026-04-01");
+    expect(sectionText).toContain("zoom.us/j/456");
+    expect(sectionText).toContain("example.com/cv.pdf");
   });
 });
