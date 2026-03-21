@@ -1,12 +1,10 @@
-继续生成一份 kapibala_slack_agent_releasenote_v2.md ,主要基于产品的角度简述更新，包括：
+优化 `P0-3: 报销对话式 + 审批` ：
 
-- 一句话总结
-- 更新的功能点，对应的应用场景，解决的问题，截图（稍后提供）
-- 后续更新计划
+## 说明
 
----
+- 增加一个通知PAYER操作，在审核人APPROVED后，同步通知PAYER有新的claim需要处理（在expenseClaimAgentApprovalCallback中实现）
+- PAYER对应环境变量为EXPENSE_CLAIM_PAYER_EMAIL，参考EXPENSE_CLAIM_APPROVER_EMAIL的使用
 
-更新 `expenseClaimAgentApprovalCallback`（server/listeners/actions/expense-claim-agent-approval.ts）
-- 如果 `status` 为 `Approved` 在 updateExpenseClaimStatus 方法中更新notion
-database 的 Approver
-- 参考 `expenseClaimFormCallback`(server/listeners/views/expense-claim-form.ts)
+在通知信息中增加一个按钮，付款（Pay），点击弹出modal，可以选择Payment Method和Payment Date，提交后通知申请人并同步到notion：
+- 参考 expenseClaimApprovalCallback 
+- 参考 notion expense claim database 的 schema(ai_input/resources/shortcuts/expnse-claim/schema.json)

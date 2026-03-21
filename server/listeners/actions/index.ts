@@ -10,6 +10,7 @@ import { candidateResumeUploadCallback } from "./candidate-resume-upload";
 import { channelJoinApprovalCallback } from "./channel-join-approval";
 import { expenseClaimAgentApprovalCallback } from "./expense-claim-agent-approval";
 import { expenseClaimApprovalCallback } from "./expense-claim-approval";
+import { expenseClaimPayCallback } from "./expense-claim-pay";
 import { expenseInvoiceUploadCallback } from "./expense-invoice-upload";
 import { feedbackButtonsCallback } from "./feedback-button-action";
 import sampleActionCallback from "./sample-action";
@@ -35,6 +36,7 @@ const register = (app: App) => {
     `${EXPENSE_CLAIM_AGENT_APPROVAL_ACTION}_reject`,
     expenseClaimAgentApprovalCallback,
   );
+  app.action("expense_claim_pay", expenseClaimPayCallback);
   app.action(CANDIDATE_RESUME_UPLOAD_ACTION, candidateResumeUploadCallback);
   app.action(EXPENSE_INVOICE_UPLOAD_ACTION, expenseInvoiceUploadCallback);
 };
