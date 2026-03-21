@@ -112,7 +112,7 @@ const feedbackFormCallback = async ({
     if (description) fields.push(`*Description:* ${description}`);
     if (tags.length > 0) fields.push(`*Tags:* ${tags.join(", ")}`);
 
-    const notificationChannel = process.env.FEEDBACK_CHANNEL_ID;
+    const notificationChannel = process.env.SLACK_FEEDBACK_CHANNEL_ID;
     if (notificationChannel) {
       await client.chat.postMessage({
         channel: notificationChannel,

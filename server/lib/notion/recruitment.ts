@@ -1,5 +1,4 @@
 import type { CreatePageParameters } from "@notionhq/client/build/src/api-endpoints";
-import { notion } from "./client";
 
 export interface RecruitmentAttachment {
   fileUploadId: string;
@@ -77,6 +76,8 @@ export async function createCandidate(data: RecruitmentData) {
     };
   }
 
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
   const page = await notion.pages.create({
     parent: {
       database_id: databaseId,
@@ -85,4 +86,24 @@ export async function createCandidate(data: RecruitmentData) {
   });
 
   return page;
+}
+
+export async function updateCandidateResume(
+  pageId: string,
+  attachments: RecruitmentAttachment[],
+) {
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
+  await notion.pages.update({
+    page_id: pageId,
+    properties: {
+      "Resume Attachment": {
+        files: attachments.map((att) => ({
+          type: "file_upload" as const,
+          file_upload: { id: att.fileUploadId },
+          name: att.filename,
+        })),
+      },
+    },
+  });
 }

@@ -1,5 +1,4 @@
 import type { CreatePageParameters } from "@notionhq/client/build/src/api-endpoints";
-import { notion } from "./client";
 
 export interface ExpenseClaimAttachment {
   fileUploadId: string;
@@ -63,6 +62,8 @@ export async function createExpenseClaim(data: ExpenseClaimData) {
     };
   }
 
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
   const page = await notion.pages.create({
     parent: {
       database_id: databaseId,
@@ -77,11 +78,33 @@ export async function updateExpenseClaimStatus(
   pageId: string,
   status: "Approved" | "Rejected",
 ) {
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
   await notion.pages.update({
     page_id: pageId,
     properties: {
       "Approval Status": {
         status: { name: status },
+      },
+    },
+  });
+}
+
+export async function updateExpenseClaimAttachments(
+  pageId: string,
+  attachments: ExpenseClaimAttachment[],
+) {
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
+  await notion.pages.update({
+    page_id: pageId,
+    properties: {
+      Attachments: {
+        files: attachments.map((att) => ({
+          type: "file_upload" as const,
+          file_upload: { id: att.fileUploadId },
+          name: att.filename,
+        })),
       },
     },
   });

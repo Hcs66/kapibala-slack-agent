@@ -60,7 +60,7 @@ const expenseClaimCallback = async ({
               },
             },
           },
-                   {
+          {
             type: "input",
             block_id: "currency",
             label: { type: "plain_text", text: "Currency" },

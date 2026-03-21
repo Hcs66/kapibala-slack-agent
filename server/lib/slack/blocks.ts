@@ -97,3 +97,150 @@ export const channelJoinApprovalBlocks = ({
 
   return [sectionBlock, actionsBlock];
 };
+
+export const EXPENSE_CLAIM_AGENT_APPROVAL_ACTION =
+  "expense_claim_agent_approval";
+
+export const expenseClaimApprovalBlocks = ({
+  pageId,
+  pageUrl,
+  claimTitle,
+  amount,
+  currency,
+  expenseType,
+  submitterId,
+}: {
+  pageId: string;
+  pageUrl: string;
+  claimTitle: string;
+  amount: number;
+  currency: string;
+  expenseType: string;
+  submitterId: string;
+}): KnownBlock[] => {
+  const fields = [
+    `*Claim Title:* ${claimTitle}`,
+    `*Amount:* ${amount} ${currency}`,
+    `*Expense Type:* ${expenseType}`,
+    `*Submitted By:* <@${submitterId}>`,
+    `*Notion:* <${pageUrl}|View in Notion>`,
+  ];
+
+  const payload = {
+    pageId,
+    pageUrl,
+    claimTitle,
+    amount,
+    currency,
+    expenseType,
+    submitterId,
+  };
+
+  const sectionBlock: SectionBlock = {
+    type: "section",
+    text: {
+      type: "mrkdwn",
+      text: `💰 *Expense Claim Approval Request*\n\n${fields.join("\n")}`,
+    },
+  };
+
+  const actionsBlock: ActionsBlock = {
+    type: "actions",
+    elements: [
+      {
+        type: "button",
+        text: { type: "plain_text", text: "Approve", emoji: true },
+        style: "primary",
+        action_id: EXPENSE_CLAIM_AGENT_APPROVAL_ACTION,
+        value: JSON.stringify({ ...payload, approved: true }),
+      },
+      {
+        type: "button",
+        text: { type: "plain_text", text: "Reject", emoji: true },
+        style: "danger",
+        action_id: `${EXPENSE_CLAIM_AGENT_APPROVAL_ACTION}_reject`,
+        value: JSON.stringify({ ...payload, approved: false }),
+      },
+    ],
+  };
+
+  return [sectionBlock, actionsBlock];
+};
+
+export const EXPENSE_INVOICE_UPLOAD_ACTION = "expense_invoice_upload";
+
+export const expenseInvoiceUploadBlocks = ({
+  pageId,
+  pageUrl,
+  claimTitle,
+  amount,
+  currency,
+}: {
+  pageId: string;
+  pageUrl: string;
+  claimTitle: string;
+  amount: number;
+  currency: string;
+}): KnownBlock[] => {
+  const sectionBlock: SectionBlock = {
+    type: "section",
+    text: {
+      type: "mrkdwn",
+      text: `📎 报销 *${claimTitle}* (${amount} ${currency}) 已提交。\n如需上传发票/收据附件，请点击下方按钮。\n<${pageUrl}|在 Notion 中查看>`,
+    },
+  };
+
+  const actionsBlock: ActionsBlock = {
+    type: "actions",
+    elements: [
+      {
+        type: "button",
+        text: {
+          type: "plain_text",
+          text: "Upload Invoice",
+          emoji: true,
+        },
+        style: "primary",
+        action_id: EXPENSE_INVOICE_UPLOAD_ACTION,
+        value: JSON.stringify({ pageId, pageUrl, claimTitle }),
+      },
+    ],
+  };
+
+  return [sectionBlock, actionsBlock];
+};
+
+export const CANDIDATE_RESUME_UPLOAD_ACTION = "candidate_resume_upload";
+
+export const candidateResumeUploadBlocks = ({
+  pageId,
+  pageUrl,
+  candidateName,
+}: {
+  pageId: string;
+  pageUrl: string;
+  candidateName: string;
+}): KnownBlock[] => {
+  const sectionBlock: SectionBlock = {
+    type: "section",
+    text: {
+      type: "mrkdwn",
+      text: `📎 候选人 *${candidateName}* 已录入 Notion。\n如需上传简历附件，请点击下方按钮。\n<${pageUrl}|在 Notion 中查看>`,
+    },
+  };
+
+  const actionsBlock: ActionsBlock = {
+    type: "actions",
+    elements: [
+      {
+        type: "button",
+        text: { type: "plain_text", text: "Upload Resume", emoji: true },
+        style: "primary",
+        action_id: CANDIDATE_RESUME_UPLOAD_ACTION,
+        value: JSON.stringify({ pageId, pageUrl, candidateName }),
+      },
+    ],
+  };
+
+  return [sectionBlock, actionsBlock];
+};

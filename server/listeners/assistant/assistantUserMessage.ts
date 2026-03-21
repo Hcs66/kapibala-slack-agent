@@ -52,13 +52,14 @@ export const assistantUserMessage: AssistantUserMessageMiddleware = async ({
     const run = await start(chatWorkflow, [
       messages,
       {
-        channel_id: context_channel_id, // The channel user was viewing (for fetching channel context)
-        dm_channel: channel, // The DM channel where the thread lives
+        channel_id: context_channel_id,
+        dm_channel: channel,
         thread_ts: thread_ts,
         is_dm,
-        team_id: teamId ?? "", // The workspace team_id for API calls
+        team_id: teamId ?? "",
         bot_id: botId,
         token: getClientToken(client),
+        user_id: userId ?? "",
       },
     ]);
 

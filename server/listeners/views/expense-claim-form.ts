@@ -121,7 +121,7 @@ const expenseClaimFormCallback = async ({
     fields.push(`*Notion:* <${pageUrl}|View in Notion>`);
     if (claimDescription) fields.push(`*Description:* ${claimDescription}`);
 
-    const notificationChannel = process.env.EXPENSE_CLAIM_CHANNEL_ID;
+    const notificationChannel = process.env.SLACK_EXPENSE_CLAIM_CHANNEL_ID;
     if (notificationChannel) {
       await client.chat.postMessage({
         channel: notificationChannel,

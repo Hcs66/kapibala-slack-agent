@@ -6,7 +6,7 @@ import type {
 } from "@slack/bolt";
 import { updateExpenseClaimStatus } from "~/lib/notion/expense-claim";
 
-interface ExpenseClaimApprovalValue {
+interface ExpenseClaimAgentApprovalValue {
   pageId: string;
   pageUrl: string;
   claimTitle: string;
@@ -17,7 +17,7 @@ interface ExpenseClaimApprovalValue {
   approved: boolean;
 }
 
-export const expenseClaimApprovalCallback = async ({
+export const expenseClaimAgentApprovalCallback = async ({
   ack,
   action,
   body,
@@ -27,7 +27,7 @@ export const expenseClaimApprovalCallback = async ({
   await ack();
 
   const buttonAction = action as ButtonAction;
-  const value: ExpenseClaimApprovalValue = JSON.parse(buttonAction.value);
+  const value: ExpenseClaimAgentApprovalValue = JSON.parse(buttonAction.value);
   const {
     pageId,
     pageUrl,
@@ -42,6 +42,9 @@ export const expenseClaimApprovalCallback = async ({
   const status = approved ? "Approved" : "Rejected";
   const statusEmoji = approved ? "\u2705" : "\u274C";
   const reviewedBy = body.user.id;
+
+  logger.info(`Expense claim ${status}: ${claimTitle} (pageId: ${pageId})`);
+
   if (body.message?.ts && body.channel?.id) {
     await client.chat.update({
       channel: body.channel.id,
