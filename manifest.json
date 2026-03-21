@@ -1,7 +1,8 @@
 {
   "display_information": {
-    "name": "Slack Agent",
-    "background_color": "#000000"
+    "name": "Kapibala Slack Agent",
+    "description": "Kapibala Slack Agent",
+    "background_color": "#bf6626"
   },
   "features": {
     "app_home": {
@@ -10,23 +11,27 @@
       "messages_tab_read_only_enabled": false
     },
     "bot_user": {
-      "display_name": "Slack Agent",
+      "display_name": "Kapibala Slack Agent",
       "always_online": true
     },
     "shortcuts": [
       {
-        "name": "Run sample shortcut",
+        "name": "New Claim",
         "type": "global",
-        "callback_id": "sample_shortcut_id",
-        "description": "Runs a sample shortcut"
-      }
-    ],
-    "slash_commands": [
+        "callback_id": "expense_claim",
+        "description": "Creates New Expense Claim"
+      },
       {
-        "command": "/sample-command",
-        "url": "https://your-app-domain.com/api/slack/events",
-        "description": "Runs a sample command",
-        "should_escape": false
+        "name": "New Feedback",
+        "type": "global",
+        "callback_id": "new_feedback",
+        "description": "Creates New Feedback"
+      },
+      {
+        "name": "New Candidate",
+        "type": "global",
+        "callback_id": "new_candidate",
+        "description": "Creates New Candidate"
       }
     ],
     "assistant_view": {
@@ -35,24 +40,58 @@
   },
   "oauth_config": {
     "scopes": {
-      "bot": [
+      "user": [
+        "search:read.public",
+        "search:read.private",
+        "search:read.mpim",
+        "search:read.im",
+        "search:read.files",
+        "search:read.users",
+        "chat:write",
         "channels:history",
+        "groups:history",
+        "mpim:history",
+        "im:history",
+        "canvases:read",
+        "canvases:write",
+        "users:read",
+        "users:read.email"
+      ],
+      "user_optional": [
+        "search:read.private",
+        "search:read.mpim",
+        "search:read.im",
+        "search:read.files",
+        "chat:write",
+        "groups:history",
+        "mpim:history",
+        "im:history",
+        "canvases:read",
+        "canvases:write"
+      ],
+      "bot": [
+        "files:write",
+        "app_mentions:read",
+        "assistant:write",
+        "channels:history",
+        "channels:join",
         "channels:read",
         "chat:write",
-        "commands",
-        "app_mentions:read",
+        "files:read",
         "groups:history",
         "im:history",
         "mpim:history",
-        "assistant:write",
         "reactions:write",
-        "channels:join"
+        "users:read",
+        "users:read.email",
+        "commands"
       ]
-    }
+    },
+    "pkce_enabled": false
   },
   "settings": {
     "event_subscriptions": {
-      "request_url": "https://your-app-domain.com/api/slack/events",
+      "request_url": "https://kapibala-slack-agent.vercel.app/api/slack/events",
       "bot_events": [
         "app_home_opened",
         "app_mention",
@@ -66,7 +105,7 @@
     },
     "interactivity": {
       "is_enabled": true,
-      "request_url": "https://your-app-domain.com/api/slack/events"
+      "request_url": "https://kapibala-slack-agent.vercel.app/api/slack/events"
     },
     "org_deploy_enabled": false,
     "socket_mode_enabled": false,
