@@ -166,3 +166,38 @@ export const expenseClaimApprovalBlocks = ({
 
   return [sectionBlock, actionsBlock];
 };
+
+export const CANDIDATE_RESUME_UPLOAD_ACTION = "candidate_resume_upload";
+
+export const candidateResumeUploadBlocks = ({
+  pageId,
+  pageUrl,
+  candidateName,
+}: {
+  pageId: string;
+  pageUrl: string;
+  candidateName: string;
+}): KnownBlock[] => {
+  const sectionBlock: SectionBlock = {
+    type: "section",
+    text: {
+      type: "mrkdwn",
+      text: `📎 候选人 *${candidateName}* 已录入 Notion。\n如需上传简历附件，请点击下方按钮。\n<${pageUrl}|在 Notion 中查看>`,
+    },
+  };
+
+  const actionsBlock: ActionsBlock = {
+    type: "actions",
+    elements: [
+      {
+        type: "button",
+        text: { type: "plain_text", text: "Upload Resume", emoji: true },
+        style: "primary",
+        action_id: CANDIDATE_RESUME_UPLOAD_ACTION,
+        value: JSON.stringify({ pageId, pageUrl, candidateName }),
+      },
+    ],
+  };
+
+  return [sectionBlock, actionsBlock];
+};

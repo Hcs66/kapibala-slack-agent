@@ -513,6 +513,7 @@ const submitCandidate = tool({
 
     const { createCandidate } = await import("~/lib/notion/recruitment");
     const { WebClient } = await import("@slack/web-api");
+    const { candidateResumeUploadBlocks } = await import("~/lib/slack/blocks");
 
     const ctx = experimental_context as SlackAgentContextInput;
 
@@ -530,11 +531,12 @@ const submitCandidate = tool({
         resumeAttachments: [],
       });
 
+      const pageId = (page as { id: string }).id;
       const pageUrl = (page as { url: string }).url;
+      const client = new WebClient(ctx.token);
 
       const notificationChannel = process.env.RECRUITMENT_CHANNEL_ID;
       if (notificationChannel) {
-        const client = new WebClient(ctx.token);
         const fields = [
           `*Candidate Name:* ${candidateName}`,
           `*Position:* ${positionApplied}`,
@@ -564,6 +566,17 @@ const submitCandidate = tool({
           ],
         });
       }
+
+      await client.chat.postMessage({
+        channel: ctx.dm_channel,
+        thread_ts: ctx.thread_ts,
+        text: `候选人 ${candidateName} 已录入，点击上传简历附件`,
+        blocks: candidateResumeUploadBlocks({
+          pageId,
+          pageUrl,
+          candidateName,
+        }),
+      });
 
       return {
         success: true,

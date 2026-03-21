@@ -1,9 +1,11 @@
 import type { App } from "@slack/bolt";
 import {
+  CANDIDATE_RESUME_UPLOAD_ACTION,
   CHANNEL_JOIN_APPROVAL_ACTION,
   EXPENSE_CLAIM_AGENT_APPROVAL_ACTION,
 } from "~/lib/slack/blocks";
 import { EXPENSE_CLAIM_APPROVAL_ACTION } from "../views/expense-claim-form";
+import { candidateResumeUploadCallback } from "./candidate-resume-upload";
 import { channelJoinApprovalCallback } from "./channel-join-approval";
 import { expenseClaimAgentApprovalCallback } from "./expense-claim-agent-approval";
 import { expenseClaimApprovalCallback } from "./expense-claim-approval";
@@ -31,6 +33,7 @@ const register = (app: App) => {
     `${EXPENSE_CLAIM_AGENT_APPROVAL_ACTION}_reject`,
     expenseClaimAgentApprovalCallback,
   );
+  app.action(CANDIDATE_RESUME_UPLOAD_ACTION, candidateResumeUploadCallback);
 };
 
 export default { register };

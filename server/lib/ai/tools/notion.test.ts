@@ -34,6 +34,7 @@ vi.mock("~/lib/notion/recruitment", () => ({
 
 vi.mock("~/lib/slack/blocks", () => ({
   expenseClaimApprovalBlocks: vi.fn().mockReturnValue([]),
+  candidateResumeUploadBlocks: vi.fn().mockReturnValue([]),
 }));
 
 import { createExpenseClaim } from "~/lib/notion/expense-claim";
@@ -593,6 +594,7 @@ describe("submitCandidate tool", () => {
 
   it("creates candidate in Notion and returns page URL", async () => {
     mockCreateCandidate.mockResolvedValue({
+      id: "page-c-1",
       url: "https://notion.so/candidate-1",
     } as ReturnType<typeof createCandidate> extends Promise<infer T>
       ? T
@@ -620,9 +622,28 @@ describe("submitCandidate tool", () => {
     });
   });
 
+  it("posts resume upload button to thread after creation", async () => {
+    mockCreateCandidate.mockResolvedValue({
+      id: "page-c-upload",
+      url: "https://notion.so/candidate-upload",
+    } as ReturnType<typeof createCandidate> extends Promise<infer T>
+      ? T
+      : never);
+
+    await executeSubmitCandidate(candidateParams);
+
+    expect(mockChatPostMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: baseContext.dm_channel,
+        thread_ts: baseContext.thread_ts,
+      }),
+    );
+  });
+
   it("posts notification to recruitment channel when configured", async () => {
     process.env.RECRUITMENT_CHANNEL_ID = "C-RECRUIT";
     mockCreateCandidate.mockResolvedValue({
+      id: "page-c-2",
       url: "https://notion.so/candidate-2",
     } as ReturnType<typeof createCandidate> extends Promise<infer T>
       ? T
@@ -638,8 +659,9 @@ describe("submitCandidate tool", () => {
     );
   });
 
-  it("skips notification when RECRUITMENT_CHANNEL_ID is not set", async () => {
+  it("still posts upload button when RECRUITMENT_CHANNEL_ID is not set", async () => {
     mockCreateCandidate.mockResolvedValue({
+      id: "page-c-3",
       url: "https://notion.so/candidate-3",
     } as ReturnType<typeof createCandidate> extends Promise<infer T>
       ? T
@@ -647,7 +669,13 @@ describe("submitCandidate tool", () => {
 
     await executeSubmitCandidate(candidateParams);
 
-    expect(mockChatPostMessage).not.toHaveBeenCalled();
+    expect(mockChatPostMessage).toHaveBeenCalledTimes(1);
+    expect(mockChatPostMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: baseContext.dm_channel,
+        thread_ts: baseContext.thread_ts,
+      }),
+    );
   });
 
   it("returns error when Notion API fails", async () => {
@@ -663,6 +691,7 @@ describe("submitCandidate tool", () => {
 
   it("handles all optional fields", async () => {
     mockCreateCandidate.mockResolvedValue({
+      id: "page-c-4",
       url: "https://notion.so/candidate-4",
     } as ReturnType<typeof createCandidate> extends Promise<infer T>
       ? T
@@ -697,6 +726,7 @@ describe("submitCandidate tool", () => {
   it("includes optional fields in channel notification", async () => {
     process.env.RECRUITMENT_CHANNEL_ID = "C-RECRUIT";
     mockCreateCandidate.mockResolvedValue({
+      id: "page-c-5",
       url: "https://notion.so/candidate-5",
     } as ReturnType<typeof createCandidate> extends Promise<infer T>
       ? T
@@ -710,8 +740,11 @@ describe("submitCandidate tool", () => {
       resumeLink: "https://example.com/cv.pdf",
     });
 
-    const callArgs = mockChatPostMessage.mock.calls[0][0];
-    const sectionText = callArgs.blocks[1].text.text;
+    const notificationCall = mockChatPostMessage.mock.calls.find(
+      (call) => call[0].channel === "C-RECRUIT",
+    );
+    expect(notificationCall).toBeDefined();
+    const sectionText = notificationCall?.[0].blocks[1].text.text;
     expect(sectionText).toContain("+1-555-0100");
     expect(sectionText).toContain("2026-04-01");
     expect(sectionText).toContain("zoom.us/j/456");

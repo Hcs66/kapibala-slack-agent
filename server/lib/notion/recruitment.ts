@@ -87,3 +87,23 @@ export async function createCandidate(data: RecruitmentData) {
 
   return page;
 }
+
+export async function updateCandidateResume(
+  pageId: string,
+  attachments: RecruitmentAttachment[],
+) {
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
+  await notion.pages.update({
+    page_id: pageId,
+    properties: {
+      "Resume Attachment": {
+        files: attachments.map((att) => ({
+          type: "file_upload" as const,
+          file_upload: { id: att.fileUploadId },
+          name: att.filename,
+        })),
+      },
+    },
+  });
+}
