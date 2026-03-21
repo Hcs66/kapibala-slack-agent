@@ -3,3 +3,10 @@
 - 一句话总结
 - 更新的功能点，对应的应用场景，解决的问题，截图（稍后提供）
 - 后续更新计划
+
+---
+
+更新 `expenseClaimAgentApprovalCallback`（server/listeners/actions/expense-claim-agent-approval.ts）
+- 如果 `status` 为 `Approved` 在 updateExpenseClaimStatus 方法中更新notion
+database 的 Approver
+- 参考 `expenseClaimFormCallback`(server/listeners/views/expense-claim-form.ts)

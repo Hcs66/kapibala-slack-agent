@@ -5,6 +5,7 @@ import type {
   SlackActionMiddlewareArgs,
 } from "@slack/bolt";
 import { updateExpenseClaimStatus } from "~/lib/notion/expense-claim";
+import { findNotionUser } from "~/lib/notion/user-map";
 
 interface ExpenseClaimAgentApprovalValue {
   pageId: string;
@@ -71,8 +72,25 @@ export const expenseClaimAgentApprovalCallback = async ({
   }
 
   try {
+    let approverNotionUserId: string | null = null;
+    if (approved) {
+      try {
+        const userInfo = await client.users.info({ user: reviewedBy });
+        const email = userInfo.user?.profile?.email;
+        if (email) {
+          approverNotionUserId = await findNotionUser(email);
+        }
+      } catch (error) {
+        console.warn(
+          "Failed to resolve Notion user for approver",
+          reviewedBy,
+          error,
+        );
+      }
+    }
+
     await Promise.all([
-      updateExpenseClaimStatus(pageId, status),
+      updateExpenseClaimStatus(pageId, status, approverNotionUserId),
       client.chat.postMessage({
         channel: submitterId,
         blocks: [
