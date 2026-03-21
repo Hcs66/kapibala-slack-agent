@@ -89,3 +89,23 @@ export async function updateExpenseClaimStatus(
     },
   });
 }
+
+export async function updateExpenseClaimAttachments(
+  pageId: string,
+  attachments: ExpenseClaimAttachment[],
+) {
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
+  await notion.pages.update({
+    page_id: pageId,
+    properties: {
+      Attachments: {
+        files: attachments.map((att) => ({
+          type: "file_upload" as const,
+          file_upload: { id: att.fileUploadId },
+          name: att.filename,
+        })),
+      },
+    },
+  });
+}

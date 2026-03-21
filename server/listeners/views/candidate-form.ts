@@ -81,7 +81,7 @@ const candidateFormCallback = async ({
     if (resumeLink) fields.push(`*Resume Link:* <${resumeLink}|View Resume>`);
     fields.push(`*Notion:* <${pageUrl}|View in Notion>`);
 
-    const notificationChannel = process.env.RECRUITMENT_CHANNEL_ID;
+    const notificationChannel = process.env.SLACK_RECRUITMENT_CHANNEL_ID;
     if (notificationChannel) {
       await client.chat.postMessage({
         channel: notificationChannel,

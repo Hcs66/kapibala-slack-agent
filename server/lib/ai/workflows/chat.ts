@@ -11,11 +11,9 @@ export async function chatWorkflow(
 
   const writable = getWritable<UIMessageChunk>();
   const agent = createSlackAgent(context);
-  console.log("================");
-
-  console.log(messages);
-
-  console.log("================");
+  // console.log("================");
+  // console.log(messages);
+  // console.log("================");
 
   await agent.stream({
     messages,

@@ -134,7 +134,7 @@ const submitFeedback = tool({
 
       const pageUrl = (page as { url: string }).url;
 
-      const notificationChannel = process.env.FEEDBACK_CHANNEL_ID;
+      const notificationChannel = process.env.SLACK_FEEDBACK_CHANNEL_ID;
       if (notificationChannel) {
         const client = new WebClient(ctx.token);
         const fields = [
@@ -399,7 +399,8 @@ const submitExpenseClaim = tool({
 
     const { createExpenseClaim } = await import("~/lib/notion/expense-claim");
     const { WebClient } = await import("@slack/web-api");
-    const { expenseClaimApprovalBlocks } = await import("~/lib/slack/blocks");
+    const { expenseClaimApprovalBlocks, expenseInvoiceUploadBlocks } =
+      await import("~/lib/slack/blocks");
 
     const ctx = experimental_context as SlackAgentContextInput;
 
@@ -425,10 +426,10 @@ const submitExpenseClaim = tool({
 
       const pageId = (page as { id: string }).id;
       const pageUrl = (page as { url: string }).url;
+      const client = new WebClient(ctx.token);
 
       const approvalsChannel = process.env.SLACK_APPROVALS_CHANNEL_ID;
       if (approvalsChannel) {
-        const client = new WebClient(ctx.token);
         await client.chat.postMessage({
           channel: approvalsChannel,
           text: `Expense claim approval request: ${claimTitle}`,
@@ -443,6 +444,19 @@ const submitExpenseClaim = tool({
           }),
         });
       }
+
+      await client.chat.postMessage({
+        channel: ctx.dm_channel,
+        thread_ts: ctx.thread_ts,
+        text: `报销 ${claimTitle} 已提交，点击上传发票/收据附件`,
+        blocks: expenseInvoiceUploadBlocks({
+          pageId,
+          pageUrl,
+          claimTitle,
+          amount,
+          currency,
+        }),
+      });
 
       return {
         success: true,
@@ -535,7 +549,7 @@ const submitCandidate = tool({
       const pageUrl = (page as { url: string }).url;
       const client = new WebClient(ctx.token);
 
-      const notificationChannel = process.env.RECRUITMENT_CHANNEL_ID;
+      const notificationChannel = process.env.SLACK_RECRUITMENT_CHANNEL_ID;
       if (notificationChannel) {
         const fields = [
           `*Candidate Name:* ${candidateName}`,

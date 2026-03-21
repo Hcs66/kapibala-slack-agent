@@ -35,6 +35,7 @@ vi.mock("~/lib/notion/recruitment", () => ({
 vi.mock("~/lib/slack/blocks", () => ({
   expenseClaimApprovalBlocks: vi.fn().mockReturnValue([]),
   candidateResumeUploadBlocks: vi.fn().mockReturnValue([]),
+  expenseInvoiceUploadBlocks: vi.fn().mockReturnValue([]),
 }));
 
 import { createExpenseClaim } from "~/lib/notion/expense-claim";
@@ -80,7 +81,7 @@ function executeSubmitFeedback(
 describe("submitFeedback tool", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.FEEDBACK_CHANNEL_ID;
+    delete process.env.SLACK_FEEDBACK_CHANNEL_ID;
   });
 
   it("creates feedback in Notion with resolved user", async () => {
@@ -151,7 +152,7 @@ describe("submitFeedback tool", () => {
   });
 
   it("posts notification to feedback channel when configured", async () => {
-    process.env.FEEDBACK_CHANNEL_ID = "C-FEEDBACK";
+    process.env.SLACK_FEEDBACK_CHANNEL_ID = "C-FEEDBACK";
     mockUsersInfo.mockResolvedValue({
       user: { profile: { email: "test@example.com" } },
     });
@@ -178,7 +179,7 @@ describe("submitFeedback tool", () => {
     );
   });
 
-  it("skips notification when FEEDBACK_CHANNEL_ID is not set", async () => {
+  it("skips notification when SLACK_FEEDBACK_CHANNEL_ID is not set", async () => {
     mockUsersInfo.mockResolvedValue({ user: { profile: {} } });
     mockCreateFeedback.mockResolvedValue({
       url: "https://notion.so/page-000",
@@ -535,7 +536,26 @@ describe("submitExpenseClaim tool", () => {
     });
   });
 
-  it("saves claim but notes missing channel when not configured", async () => {
+  it("posts invoice upload button to thread after creation", async () => {
+    mockUsersInfo.mockResolvedValue({ user: { profile: {} } });
+    mockCreateExpenseClaim.mockResolvedValue({
+      id: "page-ec-upload",
+      url: "https://notion.so/ec-upload",
+    } as ReturnType<typeof createExpenseClaim> extends Promise<infer T>
+      ? T
+      : never);
+
+    await executeSubmitExpenseClaim(expenseClaimParams);
+
+    expect(mockChatPostMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: baseContext.dm_channel,
+        thread_ts: baseContext.thread_ts,
+      }),
+    );
+  });
+
+  it("still posts upload button when SLACK_APPROVALS_CHANNEL_ID is not set", async () => {
     delete process.env.SLACK_APPROVALS_CHANNEL_ID;
     mockUsersInfo.mockResolvedValue({ user: { profile: {} } });
     mockCreateExpenseClaim.mockResolvedValue({
@@ -548,7 +568,13 @@ describe("submitExpenseClaim tool", () => {
     const result = await executeSubmitExpenseClaim(expenseClaimParams);
 
     expect(mockCreateExpenseClaim).toHaveBeenCalled();
-    expect(mockChatPostMessage).not.toHaveBeenCalled();
+    expect(mockChatPostMessage).toHaveBeenCalledTimes(1);
+    expect(mockChatPostMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: baseContext.dm_channel,
+        thread_ts: baseContext.thread_ts,
+      }),
+    );
     expect(result).toMatchObject({
       success: true,
       message: expect.stringContaining("no approvals channel"),
@@ -589,7 +615,7 @@ const candidateParams = {
 describe("submitCandidate tool", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.RECRUITMENT_CHANNEL_ID;
+    delete process.env.SLACK_RECRUITMENT_CHANNEL_ID;
   });
 
   it("creates candidate in Notion and returns page URL", async () => {
@@ -641,7 +667,7 @@ describe("submitCandidate tool", () => {
   });
 
   it("posts notification to recruitment channel when configured", async () => {
-    process.env.RECRUITMENT_CHANNEL_ID = "C-RECRUIT";
+    process.env.SLACK_RECRUITMENT_CHANNEL_ID = "C-RECRUIT";
     mockCreateCandidate.mockResolvedValue({
       id: "page-c-2",
       url: "https://notion.so/candidate-2",
@@ -659,7 +685,7 @@ describe("submitCandidate tool", () => {
     );
   });
 
-  it("still posts upload button when RECRUITMENT_CHANNEL_ID is not set", async () => {
+  it("still posts upload button when SLACK_RECRUITMENT_CHANNEL_ID is not set", async () => {
     mockCreateCandidate.mockResolvedValue({
       id: "page-c-3",
       url: "https://notion.so/candidate-3",
@@ -724,7 +750,7 @@ describe("submitCandidate tool", () => {
   });
 
   it("includes optional fields in channel notification", async () => {
-    process.env.RECRUITMENT_CHANNEL_ID = "C-RECRUIT";
+    process.env.SLACK_RECRUITMENT_CHANNEL_ID = "C-RECRUIT";
     mockCreateCandidate.mockResolvedValue({
       id: "page-c-5",
       url: "https://notion.so/candidate-5",

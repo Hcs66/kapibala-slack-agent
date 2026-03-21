@@ -167,6 +167,49 @@ export const expenseClaimApprovalBlocks = ({
   return [sectionBlock, actionsBlock];
 };
 
+export const EXPENSE_INVOICE_UPLOAD_ACTION = "expense_invoice_upload";
+
+export const expenseInvoiceUploadBlocks = ({
+  pageId,
+  pageUrl,
+  claimTitle,
+  amount,
+  currency,
+}: {
+  pageId: string;
+  pageUrl: string;
+  claimTitle: string;
+  amount: number;
+  currency: string;
+}): KnownBlock[] => {
+  const sectionBlock: SectionBlock = {
+    type: "section",
+    text: {
+      type: "mrkdwn",
+      text: `📎 报销 *${claimTitle}* (${amount} ${currency}) 已提交。\n如需上传发票/收据附件，请点击下方按钮。\n<${pageUrl}|在 Notion 中查看>`,
+    },
+  };
+
+  const actionsBlock: ActionsBlock = {
+    type: "actions",
+    elements: [
+      {
+        type: "button",
+        text: {
+          type: "plain_text",
+          text: "Upload Invoice",
+          emoji: true,
+        },
+        style: "primary",
+        action_id: EXPENSE_INVOICE_UPLOAD_ACTION,
+        value: JSON.stringify({ pageId, pageUrl, claimTitle }),
+      },
+    ],
+  };
+
+  return [sectionBlock, actionsBlock];
+};
+
 export const CANDIDATE_RESUME_UPLOAD_ACTION = "candidate_resume_upload";
 
 export const candidateResumeUploadBlocks = ({
