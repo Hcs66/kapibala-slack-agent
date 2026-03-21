@@ -122,3 +122,36 @@ export async function updateExpenseClaimAttachments(
     },
   });
 }
+
+export async function updateExpenseClaimPayment(
+  pageId: string,
+  paymentMethod: string,
+  paymentDate: string,
+  payerNotionUserId?: string | null,
+) {
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
+
+  const properties: UpdatePageParameters["properties"] = {
+    "Payment Method": {
+      select: { name: paymentMethod },
+    },
+    "Payment Date": {
+      date: { start: paymentDate },
+    },
+    "Payment Status": {
+      status: { name: "Paid" },
+    },
+  };
+
+  if (payerNotionUserId) {
+    properties.Payer = {
+      people: [{ id: payerNotionUserId }],
+    };
+  }
+
+  await notion.pages.update({
+    page_id: pageId,
+    properties,
+  });
+}

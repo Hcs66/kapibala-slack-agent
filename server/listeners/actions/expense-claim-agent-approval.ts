@@ -89,7 +89,7 @@ export const expenseClaimAgentApprovalCallback = async ({
       }
     }
 
-    await Promise.all([
+    const promises = [
       updateExpenseClaimStatus(pageId, status, approverNotionUserId),
       client.chat.postMessage({
         channel: submitterId,
@@ -106,7 +106,77 @@ export const expenseClaimAgentApprovalCallback = async ({
           },
         ],
       }),
-    ]);
+    ];
+
+    if (approved) {
+      const payerEmail = process.env.EXPENSE_CLAIM_PAYER_EMAIL;
+      if (payerEmail) {
+        try {
+          const lookupResult = await client.users.lookupByEmail({
+            email: payerEmail,
+          });
+          const payerSlackId = lookupResult.user?.id;
+          if (payerSlackId) {
+            const payButtonValue = JSON.stringify({
+              pageId,
+              pageUrl,
+              claimTitle,
+              amount,
+              currency,
+              expenseType,
+              submitterId,
+              reviewedBy,
+            });
+
+            promises.push(
+              client.chat.postMessage({
+                channel: payerSlackId,
+                text: `New approved expense claim: ${claimTitle}`,
+                blocks: [
+                  {
+                    type: "header",
+                    text: {
+                      type: "plain_text",
+                      text: "New Approved Expense Claim",
+                    },
+                  },
+                  {
+                    type: "section",
+                    text: {
+                      type: "mrkdwn",
+                      text: [
+                        `*Claim Title:* ${claimTitle}`,
+                        `*Amount:* ${amount} ${currency}`,
+                        `*Expense Type:* ${expenseType}`,
+                        `*Submitted By:* <@${submitterId}>`,
+                        `*Approved By:* <@${reviewedBy}>`,
+                        `*Notion:* <${pageUrl}|View in Notion>`,
+                      ].join("\n"),
+                    },
+                  },
+                  {
+                    type: "actions",
+                    elements: [
+                      {
+                        type: "button",
+                        text: { type: "plain_text", text: "Pay", emoji: true },
+                        style: "primary",
+                        action_id: "expense_claim_pay",
+                        value: payButtonValue,
+                      },
+                    ],
+                  },
+                ],
+              }),
+            );
+          }
+        } catch (error) {
+          console.warn("Failed to lookup payer by email:", payerEmail, error);
+        }
+      }
+    }
+
+    await Promise.all(promises);
 
     if (body.message?.ts && body.channel?.id) {
       await client.chat.update({
