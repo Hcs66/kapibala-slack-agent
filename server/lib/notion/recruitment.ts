@@ -8,7 +8,7 @@ export interface RecruitmentAttachment {
 export interface RecruitmentData {
   candidateName: string;
   positionApplied: string;
-  currentStatus: string;
+  status: string;
   resumeSource: string;
   phone: string;
   email: string;

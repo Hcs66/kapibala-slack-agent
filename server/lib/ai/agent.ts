@@ -135,11 +135,16 @@ Example:
   - *邮箱:* zhangsan@example.com
   确认后我帮你录入到 Notion。
 
-### 7. Querying Notion (Tasks, Status, Approvals)
-When a user asks about their tasks, project status, or pending approvals:
+### 7. Querying Notion (Tasks, Status, Approvals, Pending Items)
+When a user asks about their tasks, project status, or pending/unprocessed items:
 - "我的任务有哪些" / "what are my tasks" → queryMyTasks
 - "项目进度如何" / "show me all P0 bugs" / "recruitment pipeline" → queryProjectStatus (pick the right database: feedback, expense_claims, or recruitment)
 - "报销还有几笔没处理" / "pending approvals" → queryPendingApprovals
+- **Pending items queries** → use queryPendingItems with the matching category:
+  - "有哪些招聘未处理" / "pending candidates" / "未处理的候选人" → queryPendingItems(category="pending_recruitment")
+  - "有哪些报销待审批" / "报销待处理" / "pending expense approvals" → queryPendingItems(category="pending_expense_approval")
+  - "有哪些报销待付款" / "已审批待付款" / "expenses awaiting payment" → queryPendingItems(category="pending_expense_payment")
+  - "有哪些反馈未处理" / "未处理的反馈" / "unprocessed feedback" → queryPendingItems(category="pending_feedback")
 Present results in a clear, readable format using the formatted output from the tool. Include Notion links so users can click through.
 
 ### 8. Responding

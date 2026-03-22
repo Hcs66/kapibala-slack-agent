@@ -89,6 +89,7 @@ export interface FeedbackRecord {
   url: string;
   name: string;
   type: string | null;
+  status: string | null;
   description: string;
   priority: string | null;
   source: string | null;
@@ -109,7 +110,7 @@ export interface ExpenseClaimRecord {
   currency: string | null;
   expenseType: string | null;
   submissionDate: string | null;
-  approvalStatus: string | null;
+  status: string | null;
   submittedBy: Array<{ id: string; name: string | null }>;
 }
 
@@ -118,7 +119,7 @@ export interface RecruitmentRecord {
   url: string;
   candidateName: string;
   positionApplied: string | null;
-  currentStatus: string | null;
+  status: string | null;
   resumeSource: string | null;
   email: string | null;
   phone: string | null;
@@ -132,6 +133,7 @@ export function parseFeedbackPage(page: PageObjectResponse): FeedbackRecord {
     url: page.url,
     name: extractTitle(p.Name),
     type: extractSelect(p.Type),
+    status: extractStatus(p.Status) ?? extractSelect(p.Status) ?? null,
     description: extractRichText(p.Description),
     priority: extractSelect(p.Priority) ?? extractStatus(p.Priority) ?? null,
     source: extractSelect(p.Source),
@@ -157,7 +159,7 @@ export function parseExpenseClaimPage(
     currency: extractSelect(p.Currency),
     expenseType: extractSelect(p["Expense Type"]),
     submissionDate: extractDate(p["Submission Date"]),
-    approvalStatus: extractStatus(p["Approval Status"]),
+    status: extractStatus(p["Status"]),
     submittedBy: extractPeople(p["Submitted By"]),
   };
 }
@@ -171,9 +173,9 @@ export function parseRecruitmentPage(
     url: page.url,
     candidateName: extractTitle(p["Candidate Name"]),
     positionApplied: extractSelect(p["Position Applied"]),
-    currentStatus:
-      extractStatus(p["Current Status"]) ??
-      extractSelect(p["Current Status"]) ??
+    status:
+      extractStatus(p["Status"]) ??
+      extractSelect(p["Status"]) ??
       null,
     resumeSource: extractSelect(p["Resume Source"]),
     email: extractEmail(p.Email),
@@ -196,6 +198,7 @@ export async function queryFeedback(filters?: {
   type?: string;
   priority?: string;
   source?: string;
+  status?: string;
 }): Promise<FeedbackRecord[]> {
   const { getNotionClient } = await import("~/lib/notion/client");
   const notion = getNotionClient();
@@ -230,6 +233,12 @@ export async function queryFeedback(filters?: {
       select: { equals: filters.source },
     });
   }
+  if (filters?.status) {
+    conditions.push({
+      property: "Status",
+      status: { equals: filters.status },
+    });
+  }
 
   const filter =
     conditions.length > 1
@@ -245,6 +254,7 @@ export async function queryFeedback(filters?: {
     filter_properties: [
       "Name",
       "Type",
+      "Status",
       "Description",
       "Priority",
       "Source",
@@ -263,7 +273,7 @@ export async function queryFeedback(filters?: {
 
 export async function queryExpenseClaims(filters?: {
   submitterNotionUserId?: string;
-  approvalStatus?: string;
+  status?: string;
 }): Promise<ExpenseClaimRecord[]> {
   const { getNotionClient } = await import("~/lib/notion/client");
   const notion = getNotionClient();
@@ -280,10 +290,10 @@ export async function queryExpenseClaims(filters?: {
       people: { contains: filters.submitterNotionUserId },
     });
   }
-  if (filters?.approvalStatus) {
+  if (filters?.status) {
     conditions.push({
-      property: "Approval Status",
-      status: { equals: filters.approvalStatus },
+      property: "Status",
+      status: { equals: filters.status },
     });
   }
 
@@ -305,7 +315,7 @@ export async function queryExpenseClaims(filters?: {
       "Currency",
       "Expense Type",
       "Submission Date",
-      "Approval Status",
+      "Status",
       "Submitted By",
     ],
     page_size: 20,
@@ -316,7 +326,7 @@ export async function queryExpenseClaims(filters?: {
 
 export async function queryRecruitment(filters?: {
   positionApplied?: string;
-  currentStatus?: string;
+  status?: string;
 }): Promise<RecruitmentRecord[]> {
   const { getNotionClient } = await import("~/lib/notion/client");
   const notion = getNotionClient();
@@ -333,10 +343,10 @@ export async function queryRecruitment(filters?: {
       select: { equals: filters.positionApplied },
     });
   }
-  if (filters?.currentStatus) {
+  if (filters?.status) {
     conditions.push({
-      property: "Current Status",
-      status: { equals: filters.currentStatus },
+      property: "Status",
+      status: { equals: filters.status },
     });
   }
 
@@ -354,7 +364,7 @@ export async function queryRecruitment(filters?: {
     filter_properties: [
       "Candidate Name",
       "Position Applied",
-      "Current Status",
+      "Status",
       "Resume Source",
       "Email",
       "Phone",

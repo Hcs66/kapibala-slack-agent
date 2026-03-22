@@ -19,7 +19,7 @@ const candidateFormCallback = async ({
     const candidateName = values.candidate_name.value.value ?? "";
     const positionApplied =
       values.position_applied.value.selected_option?.value ?? "";
-    const currentStatus = "";
+    const status = "";
     const resumeSource =
       values.resume_source.value.selected_option?.value ?? "";
     const phone = values.phone.value.value ?? "";
@@ -55,7 +55,7 @@ const candidateFormCallback = async ({
     const page = await createCandidate({
       candidateName,
       positionApplied,
-      currentStatus,
+      status,
       resumeSource,
       phone,
       email,

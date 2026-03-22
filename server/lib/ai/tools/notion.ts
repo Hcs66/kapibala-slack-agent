@@ -32,6 +32,7 @@ function formatFeedbackList(items: FeedbackRecord[]): string {
     .map((f, i) => {
       const parts = [`${i + 1}. *${f.name}*`];
       if (f.type) parts.push(`Type: ${f.type}`);
+      if (f.status) parts.push(`Status: ${f.status}`);
       if (f.priority) parts.push(`Priority: ${f.priority}`);
       if (f.source) parts.push(`Source: ${f.source}`);
       if (f.dueDate) parts.push(`Due: ${f.dueDate}`);
@@ -50,7 +51,7 @@ function formatExpenseClaimList(items: ExpenseClaimRecord[]): string {
       if (e.amount != null && e.currency)
         parts.push(`${e.amount} ${e.currency}`);
       if (e.expenseType) parts.push(`Type: ${e.expenseType}`);
-      if (e.approvalStatus) parts.push(`Status: ${e.approvalStatus}`);
+      if (e.status) parts.push(`Status: ${e.status}`);
       if (e.submissionDate) parts.push(`Submitted: ${e.submissionDate}`);
       parts.push(`<${e.url}|View in Notion>`);
       return parts.join(" | ");
@@ -64,7 +65,7 @@ function formatRecruitmentList(items: RecruitmentRecord[]): string {
     .map((r, i) => {
       const parts = [`${i + 1}. *${r.candidateName}*`];
       if (r.positionApplied) parts.push(`Position: ${r.positionApplied}`);
-      if (r.currentStatus) parts.push(`Status: ${r.currentStatus}`);
+      if (r.status) parts.push(`Status: ${r.status}`);
       if (r.interviewTime) parts.push(`Interview: ${r.interviewTime}`);
       parts.push(`<${r.url}|View in Notion>`);
       return parts.join(" | ");
@@ -284,7 +285,7 @@ const queryProjectStatus = tool({
 
       if (database === "expense_claims") {
         const items = await queryExpenseClaims({
-          approvalStatus: filters?.status || undefined,
+          status: filters?.status || undefined,
         });
         return {
           success: true,
@@ -298,7 +299,7 @@ const queryProjectStatus = tool({
       if (database === "recruitment") {
         const items = await queryRecruitment({
           positionApplied: filters?.position || undefined,
-          currentStatus: filters?.status || undefined,
+          status: filters?.status || undefined,
         });
         return {
           success: true,
@@ -334,10 +335,10 @@ const queryPendingApprovals = tool({
     try {
       const allClaims = await queryExpenseClaims({});
       const pending = allClaims.filter(
-        (c) => !c.approvalStatus || c.approvalStatus === "Not started",
+        (c) => !c.status || c.status === "Pending",
       );
-      const approved = allClaims.filter((c) => c.approvalStatus === "Approved");
-      const rejected = allClaims.filter((c) => c.approvalStatus === "Rejected");
+      const approved = allClaims.filter((c) => c.status === "Approved");
+      const rejected = allClaims.filter((c) => c.status === "Rejected");
 
       return {
         success: true,
@@ -535,7 +536,7 @@ const submitCandidate = tool({
       const page = await createCandidate({
         candidateName,
         positionApplied,
-        currentStatus: "",
+        status: "",
         resumeSource,
         phone: phone ?? "",
         email: email ?? "",
@@ -581,6 +582,59 @@ const submitCandidate = tool({
         });
       }
 
+      const interviewerEmail = process.env.RECRUITMENT_INTERVIEWER_EMAIL;
+      if (interviewerEmail) {
+        try {
+          const lookupResult = await client.users.lookupByEmail({
+            email: interviewerEmail,
+          });
+          const interviewerSlackId = lookupResult.user?.id;
+          if (interviewerSlackId) {
+            const interviewerFields = [
+              `*Candidate Name:* ${candidateName}`,
+              `*Position:* ${positionApplied}`,
+              `*Source:* ${resumeSource}`,
+              `*Submitted By:* <@${ctx.user_id}>`,
+              `*Notion:* <${pageUrl}|View in Notion>`,
+            ];
+            if (phone) interviewerFields.push(`*Phone:* ${phone}`);
+            if (email) interviewerFields.push(`*Email:* ${email}`);
+            if (interviewTime)
+              interviewerFields.push(`*Interview Time:* ${interviewTime}`);
+            if (zoomMeetingLink)
+              interviewerFields.push(
+                `*Zoom:* <${zoomMeetingLink}|Join Meeting>`,
+              );
+            if (resumeLink)
+              interviewerFields.push(`*Resume:* <${resumeLink}|View Resume>`);
+
+            await client.chat.postMessage({
+              channel: interviewerSlackId,
+              text: `New candidate for interview: ${candidateName}`,
+              blocks: [
+                {
+                  type: "header",
+                  text: {
+                    type: "plain_text",
+                    text: "New Candidate for Interview",
+                  },
+                },
+                {
+                  type: "section",
+                  text: { type: "mrkdwn", text: interviewerFields.join("\n") },
+                },
+              ],
+            });
+          }
+        } catch (error) {
+          console.warn(
+            "Failed to lookup interviewer by email:",
+            interviewerEmail,
+            error,
+          );
+        }
+      }
+
       await client.chat.postMessage({
         channel: ctx.dm_channel,
         thread_ts: ctx.thread_ts,
@@ -608,6 +662,106 @@ const submitCandidate = tool({
   },
 });
 
+const queryPendingItems = tool({
+  description:
+    'Query pending/unprocessed items from Notion databases. Use this when the user asks about unprocessed recruitment candidates, pending expense approvals, expenses awaiting payment, or unprocessed feedback. Examples: "有哪些招聘未处理", "报销待审批", "报销待付款", "反馈未处理", "pending candidates", "unprocessed feedback".',
+  inputSchema: z.object({
+    category: z
+      .enum([
+        "pending_recruitment",
+        "pending_expense_approval",
+        "pending_expense_payment",
+        "pending_feedback",
+      ])
+      .describe(
+        "Which pending items to query: pending_recruitment (candidates with Current Status = Pending Review), pending_expense_approval (expense claims with Approval Status = Pending), pending_expense_payment (expense claims with Approval Status = Approved, awaiting payment), pending_feedback (feedback with Status = Pending)",
+      ),
+  }),
+  execute: async ({ category }, { experimental_context: _ctx }) => {
+    "use step";
+
+    const { queryFeedback, queryExpenseClaims, queryRecruitment } =
+      await import("~/lib/notion/query");
+
+    try {
+      if (category === "pending_recruitment") {
+        const items = await queryRecruitment({
+          status: "Pending Review",
+        });
+        return {
+          success: true,
+          category,
+          count: items.length,
+          message:
+            items.length > 0
+              ? `Found ${items.length} candidate(s) pending review.`
+              : "No candidates pending review.",
+          formatted: formatRecruitmentList(items),
+          items,
+        };
+      }
+
+      if (category === "pending_expense_approval") {
+        const items = await queryExpenseClaims({
+          status: "Pending",
+        });
+        return {
+          success: true,
+          category,
+          count: items.length,
+          message:
+            items.length > 0
+              ? `Found ${items.length} expense claim(s) pending approval.`
+              : "No expense claims pending approval.",
+          formatted: formatExpenseClaimList(items),
+          items,
+        };
+      }
+
+      if (category === "pending_expense_payment") {
+        const items = await queryExpenseClaims({
+          status: "Approved",
+        });
+        return {
+          success: true,
+          category,
+          count: items.length,
+          message:
+            items.length > 0
+              ? `Found ${items.length} expense claim(s) awaiting payment.`
+              : "No expense claims awaiting payment.",
+          formatted: formatExpenseClaimList(items),
+          items,
+        };
+      }
+
+      if (category === "pending_feedback") {
+        const items = await queryFeedback({ status: "Pending" });
+        return {
+          success: true,
+          category,
+          count: items.length,
+          message:
+            items.length > 0
+              ? `Found ${items.length} feedback item(s) pending processing.`
+              : "No feedback items pending processing.",
+          formatted: formatFeedbackList(items),
+          items,
+        };
+      }
+
+      return { success: false, message: `Unknown category: ${category}` };
+    } catch (error) {
+      console.error("Failed to query pending items:", error);
+      return {
+        success: false,
+        message: "Failed to query pending items from Notion",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  },
+});
+
 export const notionTools = {
   submitFeedback,
   submitExpenseClaim,
@@ -615,4 +769,5 @@ export const notionTools = {
   queryMyTasks,
   queryProjectStatus,
   queryPendingApprovals,
+  queryPendingItems,
 };

@@ -86,7 +86,7 @@ export async function updateExpenseClaimStatus(
   const notion = getNotionClient();
 
   const properties: UpdatePageParameters["properties"] = {
-    "Approval Status": {
+    "Status": {
       status: { name: status },
     },
   };
@@ -139,7 +139,7 @@ export async function updateExpenseClaimPayment(
     "Payment Date": {
       date: { start: paymentDate },
     },
-    "Payment Status": {
+    "Status": {
       status: { name: "Paid" },
     },
   };
