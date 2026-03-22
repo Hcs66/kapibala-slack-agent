@@ -581,6 +581,59 @@ const submitCandidate = tool({
         });
       }
 
+      const interviewerEmail = process.env.RECRUITMENT_INTERVIEWER_EMAIL;
+      if (interviewerEmail) {
+        try {
+          const lookupResult = await client.users.lookupByEmail({
+            email: interviewerEmail,
+          });
+          const interviewerSlackId = lookupResult.user?.id;
+          if (interviewerSlackId) {
+            const interviewerFields = [
+              `*Candidate Name:* ${candidateName}`,
+              `*Position:* ${positionApplied}`,
+              `*Source:* ${resumeSource}`,
+              `*Submitted By:* <@${ctx.user_id}>`,
+              `*Notion:* <${pageUrl}|View in Notion>`,
+            ];
+            if (phone) interviewerFields.push(`*Phone:* ${phone}`);
+            if (email) interviewerFields.push(`*Email:* ${email}`);
+            if (interviewTime)
+              interviewerFields.push(`*Interview Time:* ${interviewTime}`);
+            if (zoomMeetingLink)
+              interviewerFields.push(
+                `*Zoom:* <${zoomMeetingLink}|Join Meeting>`,
+              );
+            if (resumeLink)
+              interviewerFields.push(`*Resume:* <${resumeLink}|View Resume>`);
+
+            await client.chat.postMessage({
+              channel: interviewerSlackId,
+              text: `New candidate for interview: ${candidateName}`,
+              blocks: [
+                {
+                  type: "header",
+                  text: {
+                    type: "plain_text",
+                    text: "New Candidate for Interview",
+                  },
+                },
+                {
+                  type: "section",
+                  text: { type: "mrkdwn", text: interviewerFields.join("\n") },
+                },
+              ],
+            });
+          }
+        } catch (error) {
+          console.warn(
+            "Failed to lookup interviewer by email:",
+            interviewerEmail,
+            error,
+          );
+        }
+      }
+
       await client.chat.postMessage({
         channel: ctx.dm_channel,
         thread_ts: ctx.thread_ts,

@@ -139,7 +139,7 @@ export async function updateExpenseClaimPayment(
     "Payment Date": {
       date: { start: paymentDate },
     },
-    "Payment Status": {
+    "Approval Status": {
       status: { name: "Paid" },
     },
   };

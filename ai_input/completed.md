@@ -184,3 +184,24 @@ database 的 Approver
 - 参考 `expenseClaimFormCallback`(server/listeners/views/expense-claim-form.ts)
 
 ---
+优化 `P0-3: 报销对话式 + 审批` ：
+
+## 说明
+
+- 增加一个通知PAYER操作，在审核人APPROVED后，同步通知PAYER有新的claim需要处理（在expenseClaimAgentApprovalCallback中实现）
+- PAYER对应环境变量为EXPENSE_CLAIM_PAYER_EMAIL，参考EXPENSE_CLAIM_APPROVER_EMAIL的使用
+
+在通知信息中增加一个按钮，付款（Pay），点击弹出modal，可以选择Payment Method和Payment Date，提交后通知申请人并同步到notion：
+- 参考 expenseClaimApprovalCallback 
+- 参考 notion expense claim database 的 schema(ai_input/resources/shortcuts/expnse-claim/schema.json)
+
+---
+
+优化 `P0-4: 招聘对话式提交` ：
+
+## 说明
+
+- 增加一个通知 Interviewer 操作，在提交新的recruitment到notion后，同步在slack通知Interviewer有新的recruitment需要处理（在submitCandidate中实现）
+- Interviewer对应环境变量为RECRUITMENT_INTERVIEWER_EMAIL，参考EXPENSE_CLAIM_APPROVER_EMAIL的使用
+
+---

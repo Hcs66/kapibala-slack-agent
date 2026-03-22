@@ -86,12 +86,12 @@ export const expenseClaimPayCallback = async ({
                 value: "Cash",
               },
               {
-                text: { type: "plain_text", text: "Credit Card" },
-                value: "Credit Card",
+                text: { type: "plain_text", text: "Paynow" },
+                value: "Paynow",
               },
               {
-                text: { type: "plain_text", text: "PayPal" },
-                value: "PayPal",
+                text: { type: "plain_text", text: "OKX Transfer" },
+                value: "OKX Transfer",
               },
               {
                 text: { type: "plain_text", text: "Other" },
