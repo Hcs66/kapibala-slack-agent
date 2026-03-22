@@ -271,6 +271,7 @@ describe("queryMyTasks tool", () => {
         url: "https://notion.so/page-1",
         name: "Fix login bug",
         type: "Bug",
+        status: null,
         description: "Login broken",
         priority: "P1",
         source: "Customer",
@@ -331,6 +332,7 @@ describe("queryProjectStatus tool", () => {
         url: "https://notion.so/p1",
         name: "Bug A",
         type: "Bug",
+        status: null,
         description: "",
         priority: "P0",
         source: "Internal",
@@ -374,7 +376,7 @@ describe("queryProjectStatus tool", () => {
       count: 0,
     });
     expect(mockQueryExpenseClaims).toHaveBeenCalledWith({
-      approvalStatus: "Approved",
+      status: "Approved",
     });
   });
 
@@ -385,7 +387,7 @@ describe("queryProjectStatus tool", () => {
         url: "https://notion.so/r1",
         candidateName: "Alice",
         positionApplied: "Software Engineer",
-        currentStatus: "Interview",
+        status: "Interview",
         resumeSource: "LinkedIn",
         email: "alice@example.com",
         phone: null,
@@ -405,7 +407,7 @@ describe("queryProjectStatus tool", () => {
     });
     expect(mockQueryRecruitment).toHaveBeenCalledWith({
       positionApplied: "Software Engineer",
-      currentStatus: undefined,
+      status: undefined,
     });
   });
 });
@@ -426,7 +428,7 @@ describe("queryPendingApprovals tool", () => {
         currency: "AED",
         expenseType: "Travel",
         submissionDate: "2026-03-18",
-        approvalStatus: null,
+        status: null,
         submittedBy: [],
       },
       {
@@ -438,7 +440,7 @@ describe("queryPendingApprovals tool", () => {
         currency: "CNY",
         expenseType: "Meals",
         submissionDate: "2026-03-17",
-        approvalStatus: "Approved",
+        status: "Approved",
         submittedBy: [],
       },
     ]);
@@ -635,7 +637,7 @@ describe("submitCandidate tool", () => {
         resumeSource: "LinkedIn",
         email: "zhangsan@example.com",
         phone: "",
-        currentStatus: "",
+        status: "",
         interviewTime: null,
         zoomMeetingLink: "",
         resumeLink: "",
@@ -775,5 +777,159 @@ describe("submitCandidate tool", () => {
     expect(sectionText).toContain("2026-04-01");
     expect(sectionText).toContain("zoom.us/j/456");
     expect(sectionText).toContain("example.com/cv.pdf");
+  });
+});
+
+describe("queryPendingItems tool", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("queries pending recruitment candidates", async () => {
+    mockQueryRecruitment.mockResolvedValue([
+      {
+        id: "r1",
+        url: "https://notion.so/r1",
+        candidateName: "Alice",
+        positionApplied: "Software Engineer",
+        status: "Pending Review",
+        resumeSource: "LinkedIn",
+        email: "alice@example.com",
+        phone: null,
+        interviewTime: null,
+      },
+    ]);
+
+    const result = await executeTool("queryPendingItems", {
+      category: "pending_recruitment",
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      category: "pending_recruitment",
+      count: 1,
+    });
+    expect(mockQueryRecruitment).toHaveBeenCalledWith({
+      status: "Pending Review",
+    });
+  });
+
+  it("queries pending expense approvals", async () => {
+    mockQueryExpenseClaims.mockResolvedValue([
+      {
+        id: "e1",
+        url: "https://notion.so/e1",
+        claimTitle: "Taxi",
+        claimDescription: "Airport taxi",
+        amount: 150,
+        currency: "AED",
+        expenseType: "Travel",
+        submissionDate: "2026-03-18",
+        status: "Pending",
+        submittedBy: [],
+      },
+    ]);
+
+    const result = await executeTool("queryPendingItems", {
+      category: "pending_expense_approval",
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      category: "pending_expense_approval",
+      count: 1,
+    });
+    expect(mockQueryExpenseClaims).toHaveBeenCalledWith({
+      status: "Pending",
+    });
+  });
+
+  it("queries expenses awaiting payment", async () => {
+    mockQueryExpenseClaims.mockResolvedValue([
+      {
+        id: "e2",
+        url: "https://notion.so/e2",
+        claimTitle: "Lunch",
+        claimDescription: "Team lunch",
+        amount: 200,
+        currency: "CNY",
+        expenseType: "Meals",
+        submissionDate: "2026-03-17",
+        status: "Approved",
+        submittedBy: [],
+      },
+    ]);
+
+    const result = await executeTool("queryPendingItems", {
+      category: "pending_expense_payment",
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      category: "pending_expense_payment",
+      count: 1,
+    });
+    expect(mockQueryExpenseClaims).toHaveBeenCalledWith({
+      status: "Approved",
+    });
+  });
+
+  it("queries pending feedback", async () => {
+    mockQueryFeedback.mockResolvedValue([
+      {
+        id: "f1",
+        url: "https://notion.so/f1",
+        name: "Login bug",
+        type: "Bug",
+        status: "Pending",
+        description: "Login broken",
+        priority: "P1",
+        source: "Customer",
+        customer: "Acme",
+        assignedTo: [],
+        createdBy: [],
+        createdDate: "2026-03-15",
+        dueDate: null,
+        tags: [],
+      },
+    ]);
+
+    const result = await executeTool("queryPendingItems", {
+      category: "pending_feedback",
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      category: "pending_feedback",
+      count: 1,
+    });
+    expect(mockQueryFeedback).toHaveBeenCalledWith({ status: "Pending" });
+  });
+
+  it("returns empty results gracefully", async () => {
+    mockQueryRecruitment.mockResolvedValue([]);
+
+    const result = await executeTool("queryPendingItems", {
+      category: "pending_recruitment",
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      count: 0,
+      message: "No candidates pending review.",
+    });
+  });
+
+  it("returns error when query fails", async () => {
+    mockQueryFeedback.mockRejectedValue(new Error("DB error"));
+
+    const result = await executeTool("queryPendingItems", {
+      category: "pending_feedback",
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      error: "DB error",
+    });
   });
 });
