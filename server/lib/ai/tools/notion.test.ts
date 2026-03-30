@@ -2,11 +2,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockUsersInfo = vi.fn();
 const mockChatPostMessage = vi.fn();
+const mockConversationsReplies = vi.fn();
+const mockConversationsHistory = vi.fn();
 
 vi.mock("@slack/web-api", () => ({
   WebClient: class {
     users = { info: mockUsersInfo };
     chat = { postMessage: mockChatPostMessage };
+    conversations = {
+      replies: mockConversationsReplies,
+      history: mockConversationsHistory,
+    };
   },
 }));
 
@@ -32,12 +38,25 @@ vi.mock("~/lib/notion/recruitment", () => ({
   createCandidate: vi.fn(),
 }));
 
+vi.mock("~/lib/notion/docs", () => ({
+  createDoc: vi.fn(),
+}));
+
 vi.mock("~/lib/slack/blocks", () => ({
   expenseClaimApprovalBlocks: vi.fn().mockReturnValue([]),
   candidateResumeUploadBlocks: vi.fn().mockReturnValue([]),
   expenseInvoiceUploadBlocks: vi.fn().mockReturnValue([]),
+  saveDocApprovalBlocks: vi.fn().mockReturnValue([]),
 }));
 
+const mockHookCreate = vi.fn();
+vi.mock("~/lib/ai/workflows/hooks", () => ({
+  saveDocApprovalHook: {
+    create: (...args: unknown[]) => mockHookCreate(...args),
+  },
+}));
+
+import { createDoc } from "~/lib/notion/docs";
 import { createExpenseClaim } from "~/lib/notion/expense-claim";
 import { createFeedback } from "~/lib/notion/feedback";
 import {
@@ -56,6 +75,7 @@ const mockQueryExpenseClaims = vi.mocked(queryExpenseClaims);
 const mockQueryRecruitment = vi.mocked(queryRecruitment);
 const mockCreateExpenseClaim = vi.mocked(createExpenseClaim);
 const mockCreateCandidate = vi.mocked(createCandidate);
+const mockCreateDoc = vi.mocked(createDoc);
 
 const baseContext = {
   channel_id: "C123",
@@ -931,5 +951,265 @@ describe("queryPendingItems tool", () => {
       success: false,
       error: "DB error",
     });
+  });
+});
+
+describe("getThreadMessagesForSummary tool", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("fetches thread replies and resolves user names", async () => {
+    mockConversationsReplies.mockResolvedValue({
+      messages: [
+        {
+          user: "U001",
+          text: "Let's discuss the architecture",
+          ts: "1711612800.000000",
+        },
+        {
+          user: "U002",
+          text: "I think we should use DurableAgent",
+          ts: "1711612860.000000",
+        },
+      ],
+    });
+    mockUsersInfo
+      .mockResolvedValueOnce({ user: { real_name: "Alice", name: "alice" } })
+      .mockResolvedValueOnce({ user: { real_name: "Bob", name: "bob" } });
+
+    const result = await executeTool("getThreadMessagesForSummary", {
+      channel_id: "C123",
+      thread_ts: "1711612800.000000",
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      messageCount: 2,
+      participants: ["Alice", "Bob"],
+    });
+    expect((result as { messages: string }).messages).toContain("Alice");
+    expect((result as { messages: string }).messages).toContain("Bob");
+    expect(mockConversationsReplies).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "C123",
+        ts: "1711612800.000000",
+      }),
+    );
+  });
+
+  it("fetches channel history when no thread_ts provided", async () => {
+    mockConversationsHistory.mockResolvedValue({
+      messages: [
+        { user: "U001", text: "Morning standup", ts: "1711612800.000000" },
+      ],
+    });
+    mockUsersInfo.mockResolvedValue({
+      user: { real_name: "Alice", name: "alice" },
+    });
+
+    const result = await executeTool("getThreadMessagesForSummary", {
+      channel_id: "C123",
+    });
+
+    expect(result).toMatchObject({ success: true, messageCount: 1 });
+    expect(mockConversationsHistory).toHaveBeenCalledWith(
+      expect.objectContaining({ channel: "C123" }),
+    );
+  });
+
+  it("filters messages by user ID", async () => {
+    mockConversationsReplies.mockResolvedValue({
+      messages: [
+        { user: "U001", text: "My point is...", ts: "1711612800.000000" },
+        { user: "U002", text: "I disagree", ts: "1711612860.000000" },
+        { user: "U001", text: "Let me clarify", ts: "1711612920.000000" },
+      ],
+    });
+    mockUsersInfo.mockResolvedValue({
+      user: { real_name: "Alice", name: "alice" },
+    });
+
+    const result = await executeTool("getThreadMessagesForSummary", {
+      channel_id: "C123",
+      thread_ts: "1711612800.000000",
+      filter_user_id: "U001",
+    });
+
+    expect(result).toMatchObject({ success: true, messageCount: 2 });
+  });
+
+  it("converts ISO date strings to Unix timestamps", async () => {
+    mockConversationsReplies.mockResolvedValue({ messages: [] });
+
+    await executeTool("getThreadMessagesForSummary", {
+      channel_id: "C123",
+      thread_ts: "1711612800.000000",
+      oldest: "2026-03-28",
+    });
+
+    expect(mockConversationsReplies).toHaveBeenCalledWith(
+      expect.objectContaining({
+        oldest: expect.stringMatching(/^\d+(\.\d+)?$/),
+      }),
+    );
+  });
+
+  it("returns error when Slack API fails", async () => {
+    mockConversationsReplies.mockRejectedValue(new Error("channel_not_found"));
+
+    const result = await executeTool("getThreadMessagesForSummary", {
+      channel_id: "C999",
+      thread_ts: "1711612800.000000",
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      error: "channel_not_found",
+    });
+  });
+
+  it("handles empty messages gracefully", async () => {
+    mockConversationsReplies.mockResolvedValue({ messages: [] });
+
+    const result = await executeTool("getThreadMessagesForSummary", {
+      channel_id: "C123",
+      thread_ts: "1711612800.000000",
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      messageCount: 0,
+      participants: [],
+    });
+  });
+
+  it("falls back to user ID when user info lookup fails", async () => {
+    mockConversationsReplies.mockResolvedValue({
+      messages: [{ user: "U001", text: "Hello", ts: "1711612800.000000" }],
+    });
+    mockUsersInfo.mockRejectedValue(new Error("user_not_found"));
+
+    const result = await executeTool("getThreadMessagesForSummary", {
+      channel_id: "C123",
+      thread_ts: "1711612800.000000",
+    });
+
+    expect(result).toMatchObject({ success: true, messageCount: 1 });
+    expect((result as { messages: string }).messages).toContain("U001");
+  });
+});
+
+describe("saveDocToNotion tool", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.NOTION_DOCS_DATABASE_ID = "db-docs-123";
+    mockHookCreate.mockReturnValue(Promise.resolve({ approved: true }));
+  });
+
+  it("creates a doc in Notion after user approves via button", async () => {
+    mockUsersInfo.mockResolvedValue({
+      user: { profile: { email: "author@example.com" } },
+    });
+    mockFindNotionUser.mockResolvedValue("notion-author-123");
+    mockCreateDoc.mockResolvedValue({
+      url: "https://notion.so/doc-123",
+    } as ReturnType<typeof createDoc> extends Promise<infer T> ? T : never);
+
+    const result = await executeTool("saveDocToNotion", {
+      docName: "Agent Architecture Discussion 2026-03-28",
+      summary: "Team discussed new agent architecture approach",
+      category: ["Architecture"],
+      content:
+        "## Background\nThe team discussed...\n\n## Decisions\n- Use DurableAgent",
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      pageUrl: "https://notion.so/doc-123",
+    });
+    expect(mockChatPostMessage).toHaveBeenCalled();
+    expect(mockHookCreate).toHaveBeenCalled();
+    expect(mockCreateDoc).toHaveBeenCalledWith({
+      docName: "Agent Architecture Discussion 2026-03-28",
+      summary: "Team discussed new agent architecture approach",
+      category: ["Architecture"],
+      authorNotionUserId: "notion-author-123",
+      content:
+        "## Background\nThe team discussed...\n\n## Decisions\n- Use DurableAgent",
+    });
+  });
+
+  it("returns rejected when user clicks Cancel", async () => {
+    mockHookCreate.mockReturnValue(Promise.resolve({ approved: false }));
+
+    const result = await executeTool("saveDocToNotion", {
+      docName: "Meeting Notes",
+      summary: "Weekly sync notes",
+      category: ["Guide"],
+      content: "Notes content here",
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      rejected: true,
+    });
+    expect(mockCreateDoc).not.toHaveBeenCalled();
+  });
+
+  it("creates doc even when author resolution fails", async () => {
+    mockUsersInfo.mockRejectedValue(new Error("user_not_found"));
+    mockCreateDoc.mockResolvedValue({
+      url: "https://notion.so/doc-456",
+    } as ReturnType<typeof createDoc> extends Promise<infer T> ? T : never);
+
+    const result = await executeTool("saveDocToNotion", {
+      docName: "Meeting Notes",
+      summary: "Weekly sync notes",
+      category: ["Guide"],
+      content: "Notes content here",
+    });
+
+    expect(result).toMatchObject({ success: true });
+    expect(mockCreateDoc).toHaveBeenCalledWith(
+      expect.objectContaining({ authorNotionUserId: null }),
+    );
+  });
+
+  it("returns error when Notion API fails", async () => {
+    mockUsersInfo.mockResolvedValue({ user: { profile: {} } });
+    mockCreateDoc.mockRejectedValue(new Error("Notion API error"));
+
+    const result = await executeTool("saveDocToNotion", {
+      docName: "Will fail",
+      summary: "This should fail",
+      category: ["Tech Spec"],
+      content: "Content",
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      error: "Notion API error",
+    });
+  });
+
+  it("supports multiple categories", async () => {
+    mockUsersInfo.mockResolvedValue({ user: { profile: {} } });
+    mockCreateDoc.mockResolvedValue({
+      url: "https://notion.so/doc-multi",
+    } as ReturnType<typeof createDoc> extends Promise<infer T> ? T : never);
+
+    await executeTool("saveDocToNotion", {
+      docName: "Architecture Guide",
+      summary: "Architecture best practices",
+      category: ["Architecture", "Best Practices"],
+      content: "Guide content",
+    });
+
+    expect(mockCreateDoc).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: ["Architecture", "Best Practices"],
+      }),
+    );
   });
 });
