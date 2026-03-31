@@ -126,6 +126,21 @@ export interface RecruitmentRecord {
   interviewTime: string | null;
 }
 
+export interface TaskRecord {
+  id: string;
+  url: string;
+  name: string;
+  taskNum: string;
+  status: string | null;
+  priority: string | null;
+  description: string;
+  summary: string;
+  log: string;
+  assignee: Array<{ id: string; name: string | null }>;
+  dueDate: string | null;
+  updatedAt: string | null;
+}
+
 export function parseFeedbackPage(page: PageObjectResponse): FeedbackRecord {
   const p = page.properties;
   return {
@@ -173,14 +188,29 @@ export function parseRecruitmentPage(
     url: page.url,
     candidateName: extractTitle(p["Candidate Name"]),
     positionApplied: extractSelect(p["Position Applied"]),
-    status:
-      extractStatus(p["Status"]) ??
-      extractSelect(p["Status"]) ??
-      null,
+    status: extractStatus(p["Status"]) ?? extractSelect(p["Status"]) ?? null,
     resumeSource: extractSelect(p["Resume Source"]),
     email: extractEmail(p.Email),
     phone: extractPhone(p.Phone),
     interviewTime: extractDate(p["Interview Time"]),
+  };
+}
+
+export function parseTaskPage(page: PageObjectResponse): TaskRecord {
+  const p = page.properties;
+  return {
+    id: page.id,
+    url: page.url,
+    name: extractTitle(p.Name),
+    taskNum: extractRichText(p["Task Num"]),
+    status: extractStatus(p.Status) ?? extractSelect(p.Status) ?? null,
+    priority: extractSelect(p.Priority),
+    description: extractRichText(p.Description),
+    summary: extractRichText(p.Summary),
+    log: extractRichText(p.Log),
+    assignee: extractPeople(p.Assignee),
+    dueDate: extractDate(p["Due date"]),
+    updatedAt: page.last_edited_time,
   };
 }
 
@@ -374,4 +404,106 @@ export async function queryRecruitment(filters?: {
   });
 
   return response.results.filter(isFullPage).map(parseRecruitmentPage);
+}
+
+export async function queryTasks(filters?: {
+  assigneeNotionUserId?: string;
+  status?: string;
+  priority?: string;
+  updatedAfter?: string;
+}): Promise<TaskRecord[]> {
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
+  const dataSourceId = process.env.NOTION_TASKS_DATASOURCE_ID;
+  if (!dataSourceId) {
+    throw new Error("NOTION_TASKS_DATASOURCE_ID is not configured");
+  }
+
+  const conditions: Array<Record<string, unknown>> = [];
+
+  if (filters?.assigneeNotionUserId) {
+    conditions.push({
+      property: "Assignee",
+      people: { contains: filters.assigneeNotionUserId },
+    });
+  }
+  if (filters?.status) {
+    conditions.push({
+      property: "Status",
+      status: { equals: filters.status },
+    });
+  }
+  if (filters?.priority) {
+    conditions.push({
+      property: "Priority",
+      select: { equals: filters.priority },
+    });
+  }
+  if (filters?.updatedAfter) {
+    conditions.push({
+      timestamp: "last_edited_time",
+      last_edited_time: { on_or_after: filters.updatedAfter },
+    });
+  }
+
+  const filter =
+    conditions.length > 1
+      ? { and: conditions }
+      : conditions.length === 1
+        ? conditions[0]
+        : undefined;
+
+  const response = await notion.dataSources.query({
+    data_source_id: dataSourceId,
+    filter: filter as Parameters<typeof notion.dataSources.query>[0]["filter"],
+    sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
+    filter_properties: [
+      "Name",
+      "Task Num",
+      "Status",
+      "Priority",
+      "Description",
+      "Summary",
+      "Log",
+      "Assignee",
+      "Due date",
+    ],
+    page_size: 50,
+  });
+
+  return response.results.filter(isFullPage).map(parseTaskPage);
+}
+
+export async function findTaskByNum(
+  taskNum: string,
+): Promise<TaskRecord | null> {
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
+  const dataSourceId = process.env.NOTION_TASKS_DATASOURCE_ID;
+  if (!dataSourceId) {
+    throw new Error("NOTION_TASKS_DATASOURCE_ID is not configured");
+  }
+
+  const response = await notion.dataSources.query({
+    data_source_id: dataSourceId,
+    filter: {
+      property: "Task Num",
+      rich_text: { equals: taskNum },
+    } as Parameters<typeof notion.dataSources.query>[0]["filter"],
+    filter_properties: [
+      "Name",
+      "Task Num",
+      "Status",
+      "Priority",
+      "Description",
+      "Summary",
+      "Log",
+      "Assignee",
+      "Due date",
+    ],
+    page_size: 1,
+  });
+
+  const pages = response.results.filter(isFullPage);
+  return pages.length > 0 ? parseTaskPage(pages[0]) : null;
 }

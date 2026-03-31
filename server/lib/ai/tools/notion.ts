@@ -6,6 +6,7 @@ import type {
   ExpenseClaimRecord,
   FeedbackRecord,
   RecruitmentRecord,
+  TaskRecord,
 } from "~/lib/notion/query";
 
 async function resolveNotionUserId(
@@ -69,6 +70,24 @@ function formatRecruitmentList(items: RecruitmentRecord[]): string {
       if (r.status) parts.push(`Status: ${r.status}`);
       if (r.interviewTime) parts.push(`Interview: ${r.interviewTime}`);
       parts.push(`<${r.url}|View in Notion>`);
+      return parts.join(" | ");
+    })
+    .join("\n");
+}
+
+function formatTaskList(items: TaskRecord[]): string {
+  if (items.length === 0) return "No tasks found.";
+  return items
+    .map((t, i) => {
+      const parts = [`${i + 1}. *${t.taskNum}* ${t.name}`];
+      if (t.status) parts.push(`Status: ${t.status}`);
+      if (t.priority) parts.push(`Priority: ${t.priority}`);
+      if (t.dueDate) parts.push(`Due: ${t.dueDate}`);
+      if (t.assignee.length > 0) {
+        const names = t.assignee.map((a) => a.name ?? "Unknown").join(", ");
+        parts.push(`Assignee: ${names}`);
+      }
+      parts.push(`<${t.url}|View in Notion>`);
       return parts.join(" | ");
     })
     .join("\n");
@@ -1010,6 +1029,429 @@ const saveDocToNotion = tool({
   },
 });
 
+async function resolveSlackUserByMention(
+  token: string,
+  mentionText: string,
+): Promise<{ notionUserId: string | null; slackUserId: string | null }> {
+  try {
+    const { WebClient } = await import("@slack/web-api");
+    const { findNotionUser } = await import("~/lib/notion/user-map");
+    const client = new WebClient(token);
+
+    if (mentionText.includes("@") && mentionText.includes(".")) {
+      const notionUserId = await findNotionUser(mentionText);
+      try {
+        const lookup = await client.users.lookupByEmail({
+          email: mentionText,
+        });
+        return {
+          notionUserId,
+          slackUserId: lookup.user?.id ?? null,
+        };
+      } catch {
+        return { notionUserId, slackUserId: null };
+      }
+    }
+
+    const slackIdMatch = mentionText.match(/<@(U[A-Za-z0-9]+)>/);
+    const rawIdMatch = !slackIdMatch
+      ? mentionText.match(/^(U[A-Za-z0-9]+)$/)
+      : null;
+    const extractedUserId = slackIdMatch?.[1] ?? rawIdMatch?.[1];
+
+    if (extractedUserId) {
+      const profileResult = await client.users.profile.get({
+        user: extractedUserId,
+      });
+      const email = profileResult.profile?.email;
+      if (email) {
+        const notionUserId = await findNotionUser(email);
+        return { notionUserId, slackUserId: extractedUserId };
+      }
+      return { notionUserId: null, slackUserId: extractedUserId };
+    }
+
+    const usersResult = await client.users.list({});
+    const members = usersResult.members ?? [];
+    const normalizedMention = mentionText.toLowerCase().trim();
+
+    const matched = members.find((m) => {
+      const name = (m.name ?? "").toLowerCase();
+      const realName = (m.real_name ?? "").toLowerCase();
+      const displayName = (m.profile?.display_name ?? "").toLowerCase();
+      return (
+        name.includes(normalizedMention) ||
+        realName.includes(normalizedMention) ||
+        displayName.includes(normalizedMention)
+      );
+    });
+
+    if (matched?.id) {
+      const profileResult = await client.users.profile.get({
+        user: matched.id,
+      });
+      const email = profileResult.profile?.email;
+      const notionUserId = email ? await findNotionUser(email) : null;
+      return { notionUserId, slackUserId: matched.id };
+    }
+
+    return { notionUserId: null, slackUserId: null };
+  } catch (error) {
+    console.warn("Failed to resolve user by mention:", error);
+    return { notionUserId: null, slackUserId: null };
+  }
+}
+
+const createTaskTool = tool({
+  description:
+    'Create a new task in the Notion Tasks database. Use this when the user wants to create/assign a task. You MUST extract structured fields from the user\'s natural language and present them for confirmation BEFORE calling this tool. Only call this tool after the user confirms. Examples: "创建一个任务：B1,名称：PG schema 设计", "create task C1: design API schema, assign to @hcs, due April 1, high priority".',
+  inputSchema: z.object({
+    name: z.string().describe("Task name/title"),
+    taskNum: z
+      .string()
+      .describe(
+        "Task number identifier, usually letter+number like B1, C3, A2",
+      ),
+    description: z
+      .string()
+      .describe("Task description with details and acceptance criteria"),
+    priority: z.enum(["High", "Medium", "Low"]).describe("Task priority level"),
+    assignee: z
+      .string()
+      .optional()
+      .describe(
+        "Person to assign. MUST pass the raw Slack mention format from the message, e.g. '<@U0AL2SG6GR0>'. If the user says a name like 'hcs' or 'Chu', pass the name string directly. If an email is given, pass the email. Leave empty if not specified.",
+      ),
+    dueDate: z
+      .string()
+      .optional()
+      .describe("Due date in ISO 8601 format (e.g. 2026-04-01)"),
+  }),
+  execute: async (
+    { name, taskNum, description, priority, assignee, dueDate },
+    { experimental_context },
+  ) => {
+    "use step";
+
+    const { createTask } = await import("~/lib/notion/tasks");
+    const { WebClient } = await import("@slack/web-api");
+
+    const ctx = experimental_context as SlackAgentContextInput;
+
+    try {
+      let assigneeNotionUserId: string | null = null;
+      let assigneeSlackUserId: string | null = null;
+
+      if (assignee) {
+        const resolved = await resolveSlackUserByMention(ctx.token, assignee);
+        assigneeNotionUserId = resolved.notionUserId;
+        assigneeSlackUserId = resolved.slackUserId;
+      }
+
+      const page = await createTask({
+        name,
+        taskNum,
+        description,
+        summary: "",
+        priority,
+        assigneeNotionUserId,
+        dueDate: dueDate ?? null,
+      });
+
+      const pageUrl = (page as { url: string }).url;
+
+      if (assigneeSlackUserId) {
+        const client = new WebClient(ctx.token);
+        const fields = [
+          `*Task:* ${taskNum} - ${name}`,
+          `*Priority:* ${priority}`,
+          `*Assigned by:* <@${ctx.user_id}>`,
+          `*Notion:* <${pageUrl}|View in Notion>`,
+        ];
+        if (dueDate) fields.push(`*Due:* ${dueDate}`);
+        if (description) fields.push(`*Description:* ${description}`);
+
+        try {
+          await client.chat.postMessage({
+            channel: assigneeSlackUserId,
+            text: `New task assigned: ${taskNum} - ${name}`,
+            blocks: [
+              {
+                type: "header",
+                text: {
+                  type: "plain_text",
+                  text: `📋 New Task Assigned: ${taskNum}`,
+                },
+              },
+              {
+                type: "section",
+                text: { type: "mrkdwn", text: fields.join("\n") },
+              },
+            ],
+          });
+        } catch (dmError) {
+          console.warn("Failed to send task assignment DM:", dmError);
+        }
+      }
+
+      return {
+        success: true,
+        message: `Task "${taskNum} - ${name}" has been created in Notion.`,
+        pageUrl,
+      };
+    } catch (error) {
+      console.error("Failed to create task:", error);
+      return {
+        success: false,
+        message: "Failed to create task in Notion",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  },
+});
+
+const updateTaskTool = tool({
+  description:
+    'Update an existing task in the Notion Tasks database. Use this when the user wants to update task progress, status, or other fields. The task is identified by its Task Num (e.g. B1, C3). Progress updates are appended to the Log field. If the user says "done", "完成", "100%" etc., set status to Done; otherwise set to In Progress. Examples: "更新任务B1，进度：wa-bridge.ts 落库完成", "update task C1: schema design done".',
+  inputSchema: z.object({
+    taskNum: z
+      .string()
+      .describe(
+        "Task number to update, e.g. B1, C3. Extracted from user message.",
+      ),
+    progress: z
+      .string()
+      .optional()
+      .describe("Progress update text to append to the task Log field"),
+    status: z
+      .enum(["To Do", "In Progress", "Done"])
+      .optional()
+      .describe(
+        "New task status. Set to Done if user indicates completion (done/完成/100%), otherwise In Progress.",
+      ),
+    priority: z
+      .enum(["High", "Medium", "Low"])
+      .optional()
+      .describe("Updated priority if mentioned"),
+    assignee: z
+      .string()
+      .optional()
+      .describe(
+        "New assignee if reassignment is requested. Pass the raw Slack mention format '<@U...>' from the message, or a name/email string.",
+      ),
+    dueDate: z
+      .string()
+      .optional()
+      .describe("Updated due date in ISO 8601 format"),
+  }),
+  execute: async (
+    { taskNum, progress, status, priority, assignee, dueDate },
+    { experimental_context },
+  ) => {
+    "use step";
+
+    const { findTaskByNum } = await import("~/lib/notion/query");
+    const { updateTaskProperties } = await import("~/lib/notion/tasks");
+
+    const ctx = experimental_context as SlackAgentContextInput;
+
+    try {
+      const task = await findTaskByNum(taskNum);
+      if (!task) {
+        return {
+          success: false,
+          message: `Task "${taskNum}" not found in Notion. Please check the task number.`,
+        };
+      }
+
+      let assigneeNotionUserId: string | undefined;
+      if (assignee) {
+        const resolved = await resolveSlackUserByMention(ctx.token, assignee);
+        assigneeNotionUserId = resolved.notionUserId ?? undefined;
+      }
+
+      await updateTaskProperties(task.id, {
+        status: status ?? (progress ? "In Progress" : undefined),
+        log: progress ? { existing: task.log, newEntry: progress } : undefined,
+        priority,
+        assigneeNotionUserId,
+        dueDate,
+      });
+
+      return {
+        success: true,
+        message: `Task "${taskNum} - ${task.name}" has been updated.`,
+        pageUrl: task.url,
+        updatedFields: {
+          status: status ?? (progress ? "In Progress" : undefined),
+          progress: progress ?? undefined,
+          priority,
+          dueDate,
+        },
+      };
+    } catch (error) {
+      console.error("Failed to update task:", error);
+      return {
+        success: false,
+        message: "Failed to update task in Notion",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  },
+});
+
+const generateTaskProgress = tool({
+  description:
+    'Generate a task progress report from the Notion Tasks database and save it to Notion Docs. Use this when the user asks for a task progress table/report. Supports filtering by time range (today, this week, this month) based on the Updated at field. The report is formatted as a markdown table and automatically saved to the Notion Docs database. After generation, always share the Notion link with the user. Examples: "生成今天的任务进度表", "generate this week\'s task progress", "@agent 生成任务进度表".',
+  inputSchema: z.object({
+    timeRange: z
+      .enum(["today", "this_week", "this_month", "all"])
+      .describe(
+        "Time range filter based on task Updated at field: today, this_week, this_month, or all",
+      ),
+    skipSync: z
+      .boolean()
+      .optional()
+      .describe(
+        "Set to true ONLY if the user explicitly says they do NOT want to save to Notion. Default is false (always sync).",
+      ),
+  }),
+  execute: async ({ timeRange, skipSync }, { experimental_context }) => {
+    "use step";
+
+    const { queryTasks } = await import("~/lib/notion/query");
+
+    const ctx = experimental_context as SlackAgentContextInput;
+
+    try {
+      let updatedAfter: string | undefined;
+      const now = new Date();
+
+      if (timeRange === "today") {
+        const todayStart = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate(),
+        );
+        updatedAfter = todayStart.toISOString();
+      } else if (timeRange === "this_week") {
+        const dayOfWeek = now.getDay();
+        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        const weekStart = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate() + mondayOffset,
+        );
+        updatedAfter = weekStart.toISOString();
+      } else if (timeRange === "this_month") {
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        updatedAfter = monthStart.toISOString();
+      }
+
+      const tasks = await queryTasks({
+        updatedAfter,
+      });
+
+      if (tasks.length === 0) {
+        return {
+          success: true,
+          message: "No tasks found for the specified time range.",
+          formatted: "No tasks found.",
+          markdown: "",
+        };
+      }
+
+      const dateStr = now.toISOString().split("T")[0];
+      const rangeLabel =
+        timeRange === "today"
+          ? dateStr
+          : timeRange === "this_week"
+            ? `Week of ${dateStr}`
+            : timeRange === "this_month"
+              ? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+              : "All";
+
+      const statusEmoji: Record<string, string> = {
+        Done: "✅ 完成",
+        "In Progress": "🔵 进行中",
+        "To Do": "⬜ 未开始",
+      };
+
+      const tableRows = tasks.map((t) => {
+        const date = t.updatedAt ? t.updatedAt.split("T")[0].slice(5) : "-";
+        const statusText = statusEmoji[t.status ?? ""] ?? (t.status || "-");
+        const latestLog = t.log
+          ? (t.log
+              .split("\n")
+              .pop()
+              ?.replace(/^\[[\d-]+\]\s*/, "") ?? "-")
+          : "-";
+        return `| ${date} | ${t.taskNum} | ${t.name} | ${statusText} | ${latestLog} |`;
+      });
+
+      const markdown = [
+        `## 任务进度表 - ${rangeLabel}`,
+        "",
+        "| 日期  | #  | 任务 | 状态 | 今日进展 |",
+        "|-------|----|------|------|----------|",
+        ...tableRows,
+        "",
+        `**总进度：${tasks.filter((t) => t.status === "Done").length}/${tasks.length} 完成（${Math.round((tasks.filter((t) => t.status === "Done").length / tasks.length) * 100)}%）**`,
+      ].join("\n");
+
+      let notionPageUrl: string | undefined;
+      let syncError: string | undefined;
+
+      if (!skipSync) {
+        try {
+          const { createDoc } = await import("~/lib/notion/docs");
+
+          const authorNotionUserId = await resolveNotionUserId(
+            ctx.token,
+            ctx.user_id,
+          );
+
+          const page = await createDoc({
+            docName: `任务进度表 ${rangeLabel}`,
+            summary: `${tasks.length} tasks, ${tasks.filter((t) => t.status === "Done").length} completed`,
+            category: [],
+            authorNotionUserId,
+            content: markdown,
+          });
+
+          notionPageUrl = (page as { url: string }).url;
+        } catch (docError) {
+          console.error("Failed to sync progress to Notion:", docError);
+          syncError =
+            docError instanceof Error ? docError.message : "Unknown error";
+        }
+      }
+
+      return {
+        success: true,
+        message: notionPageUrl
+          ? `Generated progress report for ${rangeLabel}: ${tasks.length} task(s). Saved to Notion.`
+          : syncError
+            ? `Generated progress report for ${rangeLabel}: ${tasks.length} task(s). Failed to save to Notion: ${syncError}`
+            : `Generated progress report for ${rangeLabel}: ${tasks.length} task(s).`,
+        formatted: formatTaskList(tasks),
+        markdown,
+        notionPageUrl,
+        syncError,
+        taskCount: tasks.length,
+        completedCount: tasks.filter((t) => t.status === "Done").length,
+      };
+    } catch (error) {
+      console.error("Failed to generate task progress:", error);
+      return {
+        success: false,
+        message: "Failed to generate task progress report",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  },
+});
+
 export const notionTools = {
   submitFeedback,
   submitExpenseClaim,
@@ -1020,4 +1462,7 @@ export const notionTools = {
   queryPendingItems,
   getThreadMessagesForSummary,
   saveDocToNotion,
+  createTaskTool,
+  updateTaskTool,
+  generateTaskProgress,
 };
