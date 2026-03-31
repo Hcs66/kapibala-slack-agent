@@ -4,6 +4,7 @@ import {
   CHANNEL_JOIN_APPROVAL_ACTION,
   EXPENSE_CLAIM_AGENT_APPROVAL_ACTION,
   EXPENSE_INVOICE_UPLOAD_ACTION,
+  SAVE_DOC_ACTION,
 } from "~/lib/slack/blocks";
 import { EXPENSE_CLAIM_APPROVAL_ACTION } from "../views/expense-claim-form";
 import { candidateResumeUploadCallback } from "./candidate-resume-upload";
@@ -14,6 +15,7 @@ import { expenseClaimPayCallback } from "./expense-claim-pay";
 import { expenseInvoiceUploadCallback } from "./expense-invoice-upload";
 import { feedbackButtonsCallback } from "./feedback-button-action";
 import sampleActionCallback from "./sample-action";
+import { saveDocApprovalCallback } from "./save-doc-approval";
 
 const register = (app: App) => {
   app.action("sample_action_id", sampleActionCallback);
@@ -39,6 +41,8 @@ const register = (app: App) => {
   app.action("expense_claim_pay", expenseClaimPayCallback);
   app.action(CANDIDATE_RESUME_UPLOAD_ACTION, candidateResumeUploadCallback);
   app.action(EXPENSE_INVOICE_UPLOAD_ACTION, expenseInvoiceUploadCallback);
+  app.action(SAVE_DOC_ACTION, saveDocApprovalCallback);
+  app.action(`${SAVE_DOC_ACTION}_reject`, saveDocApprovalCallback);
 };
 
 export default { register };

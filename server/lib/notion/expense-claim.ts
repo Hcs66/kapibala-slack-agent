@@ -12,7 +12,6 @@ export interface ExpenseClaimData {
   claimTitle: string;
   claimDescription: string;
   amount: number;
-  currency: string;
   expenseType: string;
   paymentMethod: string;
   approverNotionUserId: string | null;
@@ -37,9 +36,6 @@ export async function createExpenseClaim(data: ExpenseClaimData) {
     },
     Amount: {
       number: data.amount,
-    },
-    Currency: {
-      select: { name: data.currency },
     },
     "Expense Type": {
       select: { name: data.expenseType },
@@ -86,7 +82,7 @@ export async function updateExpenseClaimStatus(
   const notion = getNotionClient();
 
   const properties: UpdatePageParameters["properties"] = {
-    "Status": {
+    Status: {
       status: { name: status },
     },
   };
@@ -139,7 +135,7 @@ export async function updateExpenseClaimPayment(
     "Payment Date": {
       date: { start: paymentDate },
     },
-    "Status": {
+    Status: {
       status: { name: "Paid" },
     },
   };

@@ -1,4 +1,4 @@
-# Kapibala Slack Agent v2 — Release Notes
+# kTeam Agent v2 — Release Notes
 
 ## 一句话总结
 

@@ -37,7 +37,7 @@ const expenseClaimFormCallback = async ({
     const claimTitle = values.claim_title.value.value ?? "";
     const claimDescription = values.claim_description.value.value ?? "";
     const amount = Number.parseFloat(values.amount.value.value ?? "0");
-    const currency = values.currency.value.selected_option?.value ?? "";
+    const currency = "USD";
     const expenseType = values.expense_type.value.selected_option?.value ?? "";
 
     let approverSlackId: string | null = null;
@@ -99,7 +99,6 @@ const expenseClaimFormCallback = async ({
       claimTitle,
       claimDescription,
       amount,
-      currency,
       expenseType,
       paymentMethod: "",
       approverNotionUserId,

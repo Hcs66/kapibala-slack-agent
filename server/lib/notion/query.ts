@@ -126,6 +126,21 @@ export interface RecruitmentRecord {
   interviewTime: string | null;
 }
 
+export interface TaskRecord {
+  id: string;
+  url: string;
+  name: string;
+  taskNum: string;
+  status: string | null;
+  priority: string | null;
+  description: string;
+  summary: string;
+  log: string;
+  assignee: Array<{ id: string; name: string | null }>;
+  dueDate: string | null;
+  updatedAt: string | null;
+}
+
 export function parseFeedbackPage(page: PageObjectResponse): FeedbackRecord {
   const p = page.properties;
   return {
@@ -173,14 +188,29 @@ export function parseRecruitmentPage(
     url: page.url,
     candidateName: extractTitle(p["Candidate Name"]),
     positionApplied: extractSelect(p["Position Applied"]),
-    status:
-      extractStatus(p["Status"]) ??
-      extractSelect(p["Status"]) ??
-      null,
+    status: extractStatus(p["Status"]) ?? extractSelect(p["Status"]) ?? null,
     resumeSource: extractSelect(p["Resume Source"]),
     email: extractEmail(p.Email),
     phone: extractPhone(p.Phone),
     interviewTime: extractDate(p["Interview Time"]),
+  };
+}
+
+export function parseTaskPage(page: PageObjectResponse): TaskRecord {
+  const p = page.properties;
+  return {
+    id: page.id,
+    url: page.url,
+    name: extractTitle(p.Name),
+    taskNum: extractRichText(p["Task Num"]),
+    status: extractStatus(p.Status) ?? extractSelect(p.Status) ?? null,
+    priority: extractSelect(p.Priority),
+    description: extractRichText(p.Description),
+    summary: extractRichText(p.Summary),
+    log: extractRichText(p.Log),
+    assignee: extractPeople(p.Assignee),
+    dueDate: extractDate(p["Due date"]),
+    updatedAt: page.last_edited_time,
   };
 }
 
@@ -374,4 +404,258 @@ export async function queryRecruitment(filters?: {
   });
 
   return response.results.filter(isFullPage).map(parseRecruitmentPage);
+}
+
+export async function queryTasks(filters?: {
+  assigneeNotionUserId?: string;
+  status?: string;
+  priority?: string;
+  updatedAfter?: string;
+}): Promise<TaskRecord[]> {
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
+  const dataSourceId = process.env.NOTION_TASKS_DATASOURCE_ID;
+  if (!dataSourceId) {
+    throw new Error("NOTION_TASKS_DATASOURCE_ID is not configured");
+  }
+
+  const conditions: Array<Record<string, unknown>> = [];
+
+  if (filters?.assigneeNotionUserId) {
+    conditions.push({
+      property: "Assignee",
+      people: { contains: filters.assigneeNotionUserId },
+    });
+  }
+  if (filters?.status) {
+    conditions.push({
+      property: "Status",
+      status: { equals: filters.status },
+    });
+  }
+  if (filters?.priority) {
+    conditions.push({
+      property: "Priority",
+      select: { equals: filters.priority },
+    });
+  }
+  if (filters?.updatedAfter) {
+    conditions.push({
+      timestamp: "last_edited_time",
+      last_edited_time: { on_or_after: filters.updatedAfter },
+    });
+  }
+
+  const filter =
+    conditions.length > 1
+      ? { and: conditions }
+      : conditions.length === 1
+        ? conditions[0]
+        : undefined;
+
+  const response = await notion.dataSources.query({
+    data_source_id: dataSourceId,
+    filter: filter as Parameters<typeof notion.dataSources.query>[0]["filter"],
+    sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
+    filter_properties: [
+      "Name",
+      "Task Num",
+      "Status",
+      "Priority",
+      "Description",
+      "Summary",
+      "Log",
+      "Assignee",
+      "Due date",
+    ],
+    page_size: 50,
+  });
+
+  return response.results.filter(isFullPage).map(parseTaskPage);
+}
+
+export async function findTaskByNum(
+  taskNum: string,
+): Promise<TaskRecord | null> {
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
+  const dataSourceId = process.env.NOTION_TASKS_DATASOURCE_ID;
+  if (!dataSourceId) {
+    throw new Error("NOTION_TASKS_DATASOURCE_ID is not configured");
+  }
+
+  const response = await notion.dataSources.query({
+    data_source_id: dataSourceId,
+    filter: {
+      property: "Task Num",
+      rich_text: { equals: taskNum },
+    } as Parameters<typeof notion.dataSources.query>[0]["filter"],
+    filter_properties: [
+      "Name",
+      "Task Num",
+      "Status",
+      "Priority",
+      "Description",
+      "Summary",
+      "Log",
+      "Assignee",
+      "Due date",
+    ],
+    page_size: 1,
+  });
+
+  const pages = response.results.filter(isFullPage);
+  return pages.length > 0 ? parseTaskPage(pages[0]) : null;
+}
+
+export interface BudgetRecord {
+  id: string;
+  url: string;
+  category: string;
+  monthlyBudget: number | null;
+}
+
+export function parseBudgetPage(page: PageObjectResponse): BudgetRecord {
+  const p = page.properties;
+  return {
+    id: page.id,
+    url: page.url,
+    category: extractTitle(p.Categories),
+    monthlyBudget: extractNumber(p["Monthly Budget"]),
+  };
+}
+
+export async function queryBudgets(filters?: {
+  category?: string;
+}): Promise<BudgetRecord[]> {
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
+  const dataSourceId = process.env.NOTION_BUDGET_DATASOURCE_ID;
+  if (!dataSourceId) {
+    throw new Error("NOTION_BUDGET_DATASOURCE_ID is not configured");
+  }
+
+  const conditions: Array<Record<string, unknown>> = [];
+
+  if (filters?.category) {
+    conditions.push({
+      property: "Categories",
+      title: { equals: filters.category },
+    });
+  }
+
+  const filter =
+    conditions.length > 1
+      ? { and: conditions }
+      : conditions.length === 1
+        ? conditions[0]
+        : undefined;
+
+  const response = await notion.dataSources.query({
+    data_source_id: dataSourceId,
+    filter: filter as Parameters<typeof notion.dataSources.query>[0]["filter"],
+    filter_properties: ["Categories", "Monthly Budget"],
+    page_size: 50,
+  });
+
+  return response.results.filter(isFullPage).map(parseBudgetPage);
+}
+
+export async function findBudgetByCategory(
+  category: string,
+): Promise<BudgetRecord | null> {
+  // Try exact match first
+  const exactMatch = await queryBudgets({ category });
+  if (exactMatch.length > 0) return exactMatch[0];
+
+  // Fuzzy match: query all budgets and find best match
+  const allBudgets = await queryBudgets();
+  const needle = category.toLowerCase();
+
+  // 1. Category contains the search term (e.g. "Equipment Purchases" contains "Equipment")
+  const containsMatch = allBudgets.find((b) =>
+    b.category.toLowerCase().includes(needle),
+  );
+  if (containsMatch) return containsMatch;
+
+  // 2. Search term contains the category (e.g. "Equipment and Supplies" contains "Equipment")
+  const reverseMatch = allBudgets.find((b) =>
+    needle.includes(b.category.toLowerCase()),
+  );
+  if (reverseMatch) return reverseMatch;
+
+  // 3. Any word overlap
+  const needleWords = needle.split(/\s+/);
+  const wordMatch = allBudgets.find((b) => {
+    const catWords = b.category.toLowerCase().split(/\s+/);
+    return needleWords.some((w) =>
+      catWords.some((cw) => cw.includes(w) || w.includes(cw)),
+    );
+  });
+  if (wordMatch) return wordMatch;
+
+  return null;
+}
+
+export interface ExpenseRecord {
+  id: string;
+  url: string;
+  expense: string;
+  amount: number | null;
+  date: string | null;
+}
+
+export function parseExpensePage(page: PageObjectResponse): ExpenseRecord {
+  const p = page.properties;
+  return {
+    id: page.id,
+    url: page.url,
+    expense: extractTitle(p.Expense),
+    amount: extractNumber(p.Amount),
+    date: extractDate(p.Date),
+  };
+}
+
+export async function queryExpenses(filters?: {
+  budgetPageId?: string;
+  monthPageId?: string;
+}): Promise<ExpenseRecord[]> {
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
+  const dataSourceId = process.env.NOTION_EXPENSES_DATASOURCE_ID;
+  if (!dataSourceId) {
+    throw new Error("NOTION_EXPENSES_DATASOURCE_ID is not configured");
+  }
+
+  const conditions: Array<Record<string, unknown>> = [];
+
+  if (filters?.budgetPageId) {
+    conditions.push({
+      property: "Budget",
+      relation: { contains: filters.budgetPageId },
+    });
+  }
+  if (filters?.monthPageId) {
+    conditions.push({
+      property: "Month Classification",
+      relation: { contains: filters.monthPageId },
+    });
+  }
+
+  const filter =
+    conditions.length > 1
+      ? { and: conditions }
+      : conditions.length === 1
+        ? conditions[0]
+        : undefined;
+
+  const response = await notion.dataSources.query({
+    data_source_id: dataSourceId,
+    filter: filter as Parameters<typeof notion.dataSources.query>[0]["filter"],
+    sorts: [{ property: "Date", direction: "descending" }],
+    filter_properties: ["Expense", "Amount", "Date"],
+    page_size: 100,
+  });
+
+  return response.results.filter(isFullPage).map(parseExpensePage);
 }

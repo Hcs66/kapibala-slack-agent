@@ -244,3 +244,45 @@ export const candidateResumeUploadBlocks = ({
 
   return [sectionBlock, actionsBlock];
 };
+
+export const SAVE_DOC_ACTION = "save_doc_to_notion";
+
+export const saveDocApprovalBlocks = ({
+  toolCallId,
+  docName,
+  summary,
+}: {
+  toolCallId: string;
+  docName: string;
+  summary: string;
+}): KnownBlock[] => {
+  const sectionBlock: SectionBlock = {
+    type: "section",
+    text: {
+      type: "mrkdwn",
+      text: `📝 *保存到 Notion?*\n\n*标题:* ${docName}\n*摘要:* ${summary}`,
+    },
+  };
+
+  const actionsBlock: ActionsBlock = {
+    type: "actions",
+    elements: [
+      {
+        type: "button",
+        text: { type: "plain_text", text: "Save to Notion", emoji: true },
+        style: "primary",
+        action_id: SAVE_DOC_ACTION,
+        value: JSON.stringify({ toolCallId, approved: true }),
+      },
+      {
+        type: "button",
+        text: { type: "plain_text", text: "Cancel", emoji: true },
+        style: "danger",
+        action_id: `${SAVE_DOC_ACTION}_reject`,
+        value: JSON.stringify({ toolCallId, approved: false }),
+      },
+    ],
+  };
+
+  return [sectionBlock, actionsBlock];
+};

@@ -14,3 +14,9 @@ export const channelJoinApprovalHook = defineHook({
     channelName: z.string().optional(),
   }),
 });
+
+export const saveDocApprovalHook = defineHook({
+  schema: z.object({
+    approved: z.boolean(),
+  }),
+});
