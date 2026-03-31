@@ -1,4 +1,4 @@
-# Kapibala Slack Agent v2 — 更新摘要
+# kTeam Agent v2 — 更新摘要
 
 > 基于 plan_v1 的 P0-1 ~ P0-4 实施记录。本次更新的核心目标：将 Agent 从「Slack 读消息助手」升级为「团队操作中枢」，Agent 成为 Notion 的智能中间层。
 
