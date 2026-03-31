@@ -5,6 +5,7 @@ import type {
   SlackActionMiddlewareArgs,
 } from "@slack/bolt";
 import { updateExpenseClaimStatus } from "~/lib/notion/expense-claim";
+import { syncExpenseClaimToExpenses } from "~/lib/notion/expenses";
 import { findNotionUser } from "~/lib/notion/user-map";
 
 interface ExpenseClaimAgentApprovalValue {
@@ -177,6 +178,19 @@ export const expenseClaimAgentApprovalCallback = async ({
     }
 
     await Promise.all(promises);
+
+    if (approved) {
+      try {
+        await syncExpenseClaimToExpenses({
+          claimTitle,
+          amount,
+          expenseType,
+          claimPageId: pageId,
+        });
+      } catch (syncError) {
+        console.warn("Failed to sync expense claim to expenses DB:", syncError);
+      }
+    }
 
     if (body.message?.ts && body.channel?.id) {
       await client.chat.update({

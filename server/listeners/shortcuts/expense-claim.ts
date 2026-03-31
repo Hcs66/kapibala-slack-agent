@@ -62,21 +62,8 @@ const expenseClaimCallback = async ({
           },
           {
             type: "input",
-            block_id: "currency",
-            label: { type: "plain_text", text: "Currency" },
-            element: {
-              type: "static_select",
-              action_id: "value",
-              options: ["CNY", "USD", "AED"].map((opt) => ({
-                text: { type: "plain_text" as const, text: opt },
-                value: opt,
-              })),
-            },
-          },
-          {
-            type: "input",
             block_id: "amount",
-            label: { type: "plain_text", text: "Amount" },
+            label: { type: "plain_text", text: "Amount (USD)" },
             element: {
               type: "number_input",
               action_id: "value",

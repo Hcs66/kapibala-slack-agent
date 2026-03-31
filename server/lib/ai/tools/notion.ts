@@ -4,6 +4,7 @@ import type { SlackAgentContextInput } from "~/lib/ai/context";
 import { saveDocApprovalHook } from "~/lib/ai/workflows/hooks";
 import type {
   ExpenseClaimRecord,
+  ExpenseRecord,
   FeedbackRecord,
   RecruitmentRecord,
   TaskRecord,
@@ -388,7 +389,7 @@ const queryPendingApprovals = tool({
 
 const submitExpenseClaim = tool({
   description:
-    "Submit an expense claim (reimbursement request) to Notion and send it for approval. Use this when the user wants to submit an expense or reimbursement. You MUST extract structured fields from the user's natural language and present them for confirmation BEFORE calling this tool. Only call this tool after the user confirms. After submission, the claim is sent to the approvals channel — the user will be notified via DM when it's approved or rejected.",
+    "Submit an expense claim (reimbursement request) to Notion and send it for approval. Use this when the user wants to submit an expense or reimbursement. You MUST extract structured fields from the user's natural language and present them for confirmation BEFORE calling this tool. Only call this tool after the user confirms. After submission, the claim is sent to the approvals channel — the user will be notified via DM when it's approved or rejected. All amounts are in USD.",
   inputSchema: z.object({
     claimTitle: z
       .string()
@@ -396,10 +397,7 @@ const submitExpenseClaim = tool({
     claimDescription: z
       .string()
       .describe("Detailed description of the expense"),
-    amount: z.number().describe("Expense amount as a number"),
-    currency: z
-      .enum(["CNY", "USD", "AED"])
-      .describe("Currency code: CNY, USD, or AED"),
+    amount: z.number().describe("Expense amount in USD"),
     expenseType: z
       .enum([
         "Travel",
@@ -413,7 +411,7 @@ const submitExpenseClaim = tool({
       .describe("Category of the expense"),
   }),
   execute: async (
-    { claimTitle, claimDescription, amount, currency, expenseType },
+    { claimTitle, claimDescription, amount, expenseType },
     { experimental_context },
   ) => {
     "use step";
@@ -435,7 +433,6 @@ const submitExpenseClaim = tool({
         claimTitle,
         claimDescription,
         amount,
-        currency,
         expenseType,
         paymentMethod: "",
         approverNotionUserId: null,
@@ -459,7 +456,7 @@ const submitExpenseClaim = tool({
             pageUrl,
             claimTitle,
             amount,
-            currency,
+            currency: "USD",
             expenseType,
             submitterId: ctx.user_id,
           }),
@@ -475,15 +472,15 @@ const submitExpenseClaim = tool({
           pageUrl,
           claimTitle,
           amount,
-          currency,
+          currency: "USD",
         }),
       });
 
       return {
         success: true,
         message: approvalsChannel
-          ? `Expense claim "${claimTitle}" (${amount} ${currency}) has been saved to Notion and sent for approval.`
-          : `Expense claim "${claimTitle}" (${amount} ${currency}) has been saved to Notion. Note: no approvals channel is configured.`,
+          ? `Expense claim "${claimTitle}" ($${amount}) has been saved to Notion and sent for approval.`
+          : `Expense claim "${claimTitle}" ($${amount}) has been saved to Notion. Note: no approvals channel is configured.`,
         pageUrl,
       };
     } catch (error) {
@@ -1452,6 +1449,306 @@ const generateTaskProgress = tool({
   },
 });
 
+interface BudgetStatusItem {
+  category: string;
+  monthlyBudget: number | null;
+  spent: number;
+  utilization: number | null;
+  url: string;
+}
+
+function formatBudgetStatusList(items: BudgetStatusItem[]): string {
+  if (items.length === 0) return "No budget items found.";
+  return items
+    .map((b, i) => {
+      const parts = [`${i + 1}. *${b.category}*`];
+      if (b.monthlyBudget != null) parts.push(`Budget: $${b.monthlyBudget}`);
+      parts.push(`Spent: $${b.spent}`);
+      if (b.utilization != null)
+        parts.push(`Utilization: ${Math.round(b.utilization * 100)}%`);
+      parts.push(`<${b.url}|View in Notion>`);
+      return parts.join(" | ");
+    })
+    .join("\n");
+}
+
+function formatExpenseList(items: ExpenseRecord[]): string {
+  if (items.length === 0) return "No expenses found.";
+  return items
+    .map((e, i) => {
+      const parts = [`${i + 1}. *${e.expense}*`];
+      if (e.amount != null) parts.push(`$${e.amount}`);
+      if (e.date) parts.push(`Date: ${e.date}`);
+      parts.push(`<${e.url}|View in Notion>`);
+      return parts.join(" | ");
+    })
+    .join("\n");
+}
+
+const updateBudget = tool({
+  description:
+    'Update the monthly budget amount for a specific budget category in Notion. Use this when the user wants to set or change a budget amount. Examples: "更新预算，人力资源，1000", "set rent budget to 5000", "update Equipment Purchases budget to 2000".',
+  inputSchema: z.object({
+    category: z
+      .string()
+      .describe(
+        "Budget category name in English. Available categories: Human Resources, Rent, Living Expenses, Visa Costs, Materials, Equipment Purchases, Miscellaneous, Transportation & Travel, Client Entertainment. The tool will fuzzy-match if not exact.",
+      ),
+    monthlyBudget: z.number().describe("The new monthly budget amount in USD"),
+  }),
+  execute: async (
+    { category, monthlyBudget },
+    { experimental_context: _ctx },
+  ) => {
+    "use step";
+
+    const { findBudgetByCategory } = await import("~/lib/notion/query");
+    const { updateBudgetAmount } = await import("~/lib/notion/budget");
+
+    try {
+      const budget = await findBudgetByCategory(category);
+      if (!budget) {
+        return {
+          success: false,
+          message: `Budget category "${category}" not found. Please check the category name.`,
+        };
+      }
+
+      await updateBudgetAmount(budget.id, monthlyBudget);
+
+      return {
+        success: true,
+        message: `Budget for "${category}" has been updated to $${monthlyBudget}.`,
+        pageUrl: budget.url,
+      };
+    } catch (error) {
+      console.error("Failed to update budget:", error);
+      return {
+        success: false,
+        message: "Failed to update budget in Notion",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  },
+});
+
+const addExpense = tool({
+  description:
+    'Add a new expense entry to the Notion expenses database. The agent should infer the budget category from the expense description and automatically resolve the current month. Use this when the user wants to record a spending. Examples: "添加支出，macbook，200", "add expense: team lunch 50", "记录支出：办公椅 300".',
+  inputSchema: z.object({
+    expenseName: z
+      .string()
+      .describe(
+        "Name/description of the expense, e.g. MacBook Pro, Team Lunch",
+      ),
+    amount: z.number().describe("Expense amount in USD"),
+    category: z
+      .string()
+      .describe(
+        "Budget category inferred from the expense description. Available categories: Human Resources (人力资源), Rent (房租), Living Expenses (生活费), Visa Costs (签证成本), Materials (物料), Equipment Purchases (设备购买), Miscellaneous (杂费), Transportation & Travel (交通差旅), Client Entertainment (客请费用). Use the English name. The tool will fuzzy-match if not exact.",
+      ),
+    date: z
+      .string()
+      .optional()
+      .describe(
+        "Expense date in ISO 8601 format (e.g. 2026-03-31). Defaults to today if not specified.",
+      ),
+  }),
+  execute: async (
+    { expenseName, amount, category, date },
+    { experimental_context: _ctx },
+  ) => {
+    "use step";
+
+    const { findBudgetByCategory } = await import("~/lib/notion/query");
+    const { createExpense } = await import("~/lib/notion/expenses");
+    const { findMonthByName, getCurrentMonthName } = await import(
+      "~/lib/notion/month"
+    );
+
+    try {
+      const budget = await findBudgetByCategory(category);
+      if (!budget) {
+        return {
+          success: false,
+          message: `Budget category "${category}" not found. Please check the category name.`,
+        };
+      }
+
+      const monthName = getCurrentMonthName();
+      const month = await findMonthByName(monthName);
+      if (!month) {
+        return {
+          success: false,
+          message: `Month "${monthName}" not found in the Month Classification database.`,
+        };
+      }
+
+      const expenseDate = date || new Date().toISOString().split("T")[0];
+
+      const page = await createExpense({
+        expenseName,
+        amount,
+        date: expenseDate,
+        claimPageId: null,
+        budgetPageId: budget.id,
+        monthPageId: month.id,
+      });
+
+      const pageUrl = (page as { url: string }).url;
+
+      return {
+        success: true,
+        message: `Expense "${expenseName}" ($${amount}) has been added under "${category}" for ${monthName}.`,
+        pageUrl,
+      };
+    } catch (error) {
+      console.error("Failed to add expense:", error);
+      return {
+        success: false,
+        message: "Failed to add expense to Notion",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  },
+});
+
+const queryBudgetStatus = tool({
+  description:
+    'Query budget status from Notion. Shows monthly budget, current spending, and utilization for one or all categories. Use this when the user asks about budget, spending, or utilization. Examples: "查看本月人力资源预算", "本月总支出", "查看本月设备支出", "budget status", "how much have we spent this month".',
+  inputSchema: z.object({
+    category: z
+      .string()
+      .optional()
+      .describe(
+        "Specific budget category to query (English). If omitted, returns all categories.",
+      ),
+    includeExpenses: z
+      .boolean()
+      .optional()
+      .describe(
+        "If true, also return individual expense line items for the category. Default false.",
+      ),
+  }),
+  execute: async (
+    { category, includeExpenses },
+    { experimental_context: _ctx },
+  ) => {
+    "use step";
+
+    const { queryBudgets, queryExpenses, findBudgetByCategory } = await import(
+      "~/lib/notion/query"
+    );
+    const { findMonthByName, getCurrentMonthName } = await import(
+      "~/lib/notion/month"
+    );
+
+    try {
+      const monthName = getCurrentMonthName();
+      const month = await findMonthByName(monthName);
+
+      if (!month) {
+        return {
+          success: false,
+          message: `Month "${monthName}" not found in the Month Classification database.`,
+        };
+      }
+
+      if (category) {
+        const budget = await findBudgetByCategory(category);
+        if (!budget) {
+          return {
+            success: false,
+            message: `Budget category "${category}" not found.`,
+          };
+        }
+
+        const expenses = await queryExpenses({
+          budgetPageId: budget.id,
+          monthPageId: month.id,
+        });
+
+        const spent = expenses.reduce((sum, e) => sum + (e.amount ?? 0), 0);
+        const utilization =
+          budget.monthlyBudget && budget.monthlyBudget > 0
+            ? spent / budget.monthlyBudget
+            : null;
+
+        const statusItem: BudgetStatusItem = {
+          category: budget.category,
+          monthlyBudget: budget.monthlyBudget,
+          spent,
+          utilization,
+          url: budget.url,
+        };
+
+        return {
+          success: true,
+          month: monthName,
+          category: budget.category,
+          monthlyBudget: budget.monthlyBudget,
+          spent,
+          utilization:
+            utilization != null ? Math.round(utilization * 100) : null,
+          formatted: formatBudgetStatusList([statusItem]),
+          expenses: includeExpenses ? formatExpenseList(expenses) : undefined,
+          expenseItems: includeExpenses ? expenses : undefined,
+        };
+      }
+
+      const budgets = await queryBudgets();
+
+      const statusItems: BudgetStatusItem[] = await Promise.all(
+        budgets.map(async (b) => {
+          const expenses = await queryExpenses({
+            budgetPageId: b.id,
+            monthPageId: month.id,
+          });
+          const spent = expenses.reduce((sum, e) => sum + (e.amount ?? 0), 0);
+          const utilization =
+            b.monthlyBudget && b.monthlyBudget > 0
+              ? spent / b.monthlyBudget
+              : null;
+          return {
+            category: b.category,
+            monthlyBudget: b.monthlyBudget,
+            spent,
+            utilization,
+            url: b.url,
+          };
+        }),
+      );
+
+      const totalBudget = statusItems.reduce(
+        (sum, b) => sum + (b.monthlyBudget ?? 0),
+        0,
+      );
+      const totalSpent = statusItems.reduce((sum, b) => sum + b.spent, 0);
+      const overallUtilization = totalBudget > 0 ? totalSpent / totalBudget : 0;
+
+      return {
+        success: true,
+        month: monthName,
+        summary: {
+          totalBudget,
+          totalSpent,
+          overallUtilization: Math.round(overallUtilization * 100),
+          categoryCount: statusItems.length,
+        },
+        formatted: formatBudgetStatusList(statusItems),
+        budgets: statusItems,
+      };
+    } catch (error) {
+      console.error("Failed to query budget status:", error);
+      return {
+        success: false,
+        message: "Failed to query budget status from Notion",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  },
+});
+
 export const notionTools = {
   submitFeedback,
   submitExpenseClaim,
@@ -1465,4 +1762,7 @@ export const notionTools = {
   createTaskTool,
   updateTaskTool,
   generateTaskProgress,
+  updateBudget,
+  addExpense,
+  queryBudgetStatus,
 };

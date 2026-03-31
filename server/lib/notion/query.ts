@@ -507,3 +507,155 @@ export async function findTaskByNum(
   const pages = response.results.filter(isFullPage);
   return pages.length > 0 ? parseTaskPage(pages[0]) : null;
 }
+
+export interface BudgetRecord {
+  id: string;
+  url: string;
+  category: string;
+  monthlyBudget: number | null;
+}
+
+export function parseBudgetPage(page: PageObjectResponse): BudgetRecord {
+  const p = page.properties;
+  return {
+    id: page.id,
+    url: page.url,
+    category: extractTitle(p.Categories),
+    monthlyBudget: extractNumber(p["Monthly Budget"]),
+  };
+}
+
+export async function queryBudgets(filters?: {
+  category?: string;
+}): Promise<BudgetRecord[]> {
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
+  const dataSourceId = process.env.NOTION_BUDGET_DATASOURCE_ID;
+  if (!dataSourceId) {
+    throw new Error("NOTION_BUDGET_DATASOURCE_ID is not configured");
+  }
+
+  const conditions: Array<Record<string, unknown>> = [];
+
+  if (filters?.category) {
+    conditions.push({
+      property: "Categories",
+      title: { equals: filters.category },
+    });
+  }
+
+  const filter =
+    conditions.length > 1
+      ? { and: conditions }
+      : conditions.length === 1
+        ? conditions[0]
+        : undefined;
+
+  const response = await notion.dataSources.query({
+    data_source_id: dataSourceId,
+    filter: filter as Parameters<typeof notion.dataSources.query>[0]["filter"],
+    filter_properties: ["Categories", "Monthly Budget"],
+    page_size: 50,
+  });
+
+  return response.results.filter(isFullPage).map(parseBudgetPage);
+}
+
+export async function findBudgetByCategory(
+  category: string,
+): Promise<BudgetRecord | null> {
+  // Try exact match first
+  const exactMatch = await queryBudgets({ category });
+  if (exactMatch.length > 0) return exactMatch[0];
+
+  // Fuzzy match: query all budgets and find best match
+  const allBudgets = await queryBudgets();
+  const needle = category.toLowerCase();
+
+  // 1. Category contains the search term (e.g. "Equipment Purchases" contains "Equipment")
+  const containsMatch = allBudgets.find((b) =>
+    b.category.toLowerCase().includes(needle),
+  );
+  if (containsMatch) return containsMatch;
+
+  // 2. Search term contains the category (e.g. "Equipment and Supplies" contains "Equipment")
+  const reverseMatch = allBudgets.find((b) =>
+    needle.includes(b.category.toLowerCase()),
+  );
+  if (reverseMatch) return reverseMatch;
+
+  // 3. Any word overlap
+  const needleWords = needle.split(/\s+/);
+  const wordMatch = allBudgets.find((b) => {
+    const catWords = b.category.toLowerCase().split(/\s+/);
+    return needleWords.some((w) =>
+      catWords.some((cw) => cw.includes(w) || w.includes(cw)),
+    );
+  });
+  if (wordMatch) return wordMatch;
+
+  return null;
+}
+
+export interface ExpenseRecord {
+  id: string;
+  url: string;
+  expense: string;
+  amount: number | null;
+  date: string | null;
+}
+
+export function parseExpensePage(page: PageObjectResponse): ExpenseRecord {
+  const p = page.properties;
+  return {
+    id: page.id,
+    url: page.url,
+    expense: extractTitle(p.Expense),
+    amount: extractNumber(p.Amount),
+    date: extractDate(p.Date),
+  };
+}
+
+export async function queryExpenses(filters?: {
+  budgetPageId?: string;
+  monthPageId?: string;
+}): Promise<ExpenseRecord[]> {
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
+  const dataSourceId = process.env.NOTION_EXPENSES_DATASOURCE_ID;
+  if (!dataSourceId) {
+    throw new Error("NOTION_EXPENSES_DATASOURCE_ID is not configured");
+  }
+
+  const conditions: Array<Record<string, unknown>> = [];
+
+  if (filters?.budgetPageId) {
+    conditions.push({
+      property: "Budget",
+      relation: { contains: filters.budgetPageId },
+    });
+  }
+  if (filters?.monthPageId) {
+    conditions.push({
+      property: "Month Classification",
+      relation: { contains: filters.monthPageId },
+    });
+  }
+
+  const filter =
+    conditions.length > 1
+      ? { and: conditions }
+      : conditions.length === 1
+        ? conditions[0]
+        : undefined;
+
+  const response = await notion.dataSources.query({
+    data_source_id: dataSourceId,
+    filter: filter as Parameters<typeof notion.dataSources.query>[0]["filter"],
+    sorts: [{ property: "Date", direction: "descending" }],
+    filter_properties: ["Expense", "Amount", "Date"],
+    page_size: 100,
+  });
+
+  return response.results.filter(isFullPage).map(parseExpensePage);
+}

@@ -541,7 +541,6 @@ describe("submitExpenseClaim tool", () => {
       expect.objectContaining({
         claimTitle: "Airport taxi",
         amount: 150,
-        currency: "AED",
         expenseType: "Travel",
         submittedByNotionUserId: "notion-user-111",
       }),
