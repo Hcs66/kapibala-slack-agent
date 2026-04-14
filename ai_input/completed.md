@@ -726,3 +726,17 @@ Agent 收到总结请求后：
 - P2-3: 面试日历 + 提醒 → Google Calendar 集成
 
 ---
+再根据已完成模块和release文档(docs/kTeam_agent_releasenote_v2.md、docs/kTeam_agent_releasenote_v3.md)，生成一份用户使用手册(docs/kTeam_agent_manual.md)，包括：
+
+按技能划分，包括：
+- 技能名称
+- 技能说明
+- 应用场景
+- 使用举例
+- 返回结果说明
+- 流程（如有，例如报销审批）
+
+
+---
+请仔细阅读kapibala公司分析和kTeam后续迭代建议(ai_input/resources/roadmap_v4.md)，帮我生成一份详细的v4迭代计划
+---

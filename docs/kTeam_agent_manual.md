@@ -1,6 +1,6 @@
 # kTeam Agent — 用户使用手册
 
-> 本手册按技能划分，涵盖 kTeam Agent 的全部能力。在 Slack 中与 Agent 对话或在频道中 @Agent 即可使用。
+> 本手册按技能划分，涵盖 kTeam Agent 的全部能力。在 Slack 中与 Agent 对话、在频道中 @Agent 或使用 Shortcut 即可使用。
 
 ---
 
@@ -23,17 +23,19 @@
 
 ### 技能名称
 
-对话式提交反馈（Bug / Feature Request / Improvement / Question）
+对话式提交反馈（Bug / Feature Request / Enhancement）
 
 ### 技能说明
 
-用自然语言描述问题或需求，Agent 自动提取结构化字段（标题、类型、优先级、来源等），展示摘要让你确认后写入 Notion Feedback 数据库。提交后自动通知 #feedback 频道。
+用自然语言描述问题或需求，Agent 自动提取结构化字段（标题、类型、优先级、来源、客户、标签等），展示摘要让你确认后写入 Notion Feedback 数据库。提交后自动通知 #feedback 频道。
 
 ### 应用场景
 
 - 开发同事发现 Bug：「登录页点确认没反应，客户 A 反馈的，挺急的」
 - 产品经理提需求：「加个暗黑模式吧，不急」
 - 团队成员提改进建议：「部署流程太慢了，能不能优化一下」
+- 性能问题：「页面加载太慢了」
+- 安全问题：「发现一个 XSS 漏洞」
 
 ### 使用举例
 
@@ -43,28 +45,43 @@
 **Agent 回复：**
 > 收到，我整理了一下：
 > - *标题:* 登录页确认按钮无响应
-> - *类型:* Bug
+> - *类型:* Bug Fix
 > - *优先级:* P1（客户反馈 + 紧急）
-> - *来源:* Customer
+> - *来源:* Customer Feedback
 > - *客户:* A
 > - *描述:* 登录页点确认没反应
 >
 > 需要修改吗？确认后我帮你提交到 Notion。
 
+![Feedback 提交截图](screenshots/feedback/feedback.png)
+
 **用户：** 确认
 
 **Agent 回复：**
 > 已提交到 Notion：[View in Notion](链接)
+> 已通知 #feedback 频道。
 
 ### 返回结果说明
 
 - 提交成功：返回 Notion 页面链接
 - 提交前：Agent 展示提取的字段摘要，等待用户确认或修改
 - 优先级自动推断规则：
-  - P0：「blocker」「生产环境挂了」
-  - P1：「urgent」「客户反馈」「挺急的」
+  - P0：「blocker」「production down」「can't use the product」
+  - P1：「urgent」「挺急的」「客户反馈」「customer reported」
   - P2：普通请求（默认）
-  - P3：「nice to have」「不急」
+  - P3：「nice to have」「不急」「low priority」
+
+### 支持的类型
+
+Feature Request、Enhancement、Bug Fix、Consultation、Documentation、Performance、Security
+
+### 支持的来源
+
+Customer Feedback、Internal Proposal、Market Research、Competitive Analysis、User Testing、Support Tickets、Stakeholder Request
+
+### 支持的标签
+
+Urgent、Key Customer、Technical Debt、Quick Win、Strategic、Compliance、Performance、Security、UX、Integration
 
 ---
 
@@ -72,7 +89,7 @@
 
 ### 技能名称
 
-Notion 数据查询（反馈 / 报销 / 招聘 / 待办事项）
+Notion 数据查询（反馈 / 报销 / 招聘 / 任务）
 
 ### 技能说明
 
@@ -83,18 +100,20 @@ Notion 数据查询（反馈 / 报销 / 招聘 / 待办事项）
 - 查看自己的任务：「我的任务有哪些」
 - 查看未处理事项：「有哪些招聘未处理」「报销待审批」「反馈未处理」
 - 查看项目状态：「show me all P0 bugs」「recruitment pipeline status」
-- 管理者全局视角：「目前有多少待审批的报销？」
+- 管理者全局视角：「目前有多少待审批的报销？」「Software Engineer 岗位有几个候选人？」
 
 ### 使用举例
 
 | 你说 | Agent 查询 |
 |---|---|
-| 我的任务有哪些 | 查询你被分配的 Feedback 条目 |
+| 我的任务有哪些 | 查询你被分配的 Task 条目 |
 | 有哪些招聘未处理 | 查询 Status = Pending Review 的候选人 |
 | 有哪些报销待审批 | 查询 Approval Status = Pending 的报销 |
 | 有哪些报销待付款 | 查询 Approval Status = Approved 的报销 |
 | 有哪些反馈未处理 | 查询 Status = Pending 的反馈 |
 | show me all P0 bugs | 查询 Priority = P0 的 Feedback |
+
+![Notion 查询截图](screenshots/query/query.png)
 
 ### 返回结果说明
 
@@ -119,6 +138,7 @@ Notion 数据查询（反馈 / 报销 / 招聘 / 待办事项）
 - 出差回来随手报销：「我要报销上周打车 150」
 - 采购报销：「报销一台显示器 300，Equipment」
 - 团建餐费：「报销昨天团队午餐 80」
+- 办公用品：「报销纸笔 50，Office Supplies」
 
 ### 使用举例
 
@@ -134,17 +154,46 @@ Notion 数据查询（反馈 / 报销 / 招聘 / 待办事项）
 >
 > 确认后我帮你提交，审批人会在 #expense-claims 频道收到通知。
 
+![报销提交截图](screenshots/expense_claim/claims_01_request.png)
+
 **用户：** 确认
 
 **Agent 回复：**
 > 报销已提交：[View in Notion](链接)
 > 审批人已收到通知，审批结果会通过 DM 通知你。
 
+### 审批流程
+
+审批人在 #expense-claims 频道看到审批消息，包含 Approve / Reject 按钮：
+
+**审批人点击 Approve：**
+- 更新 Notion 中 Approval Status = Approved
+- DM 通知提交者：「你的报销已批准」
+- 通知付款人付款（附带 Pay 按钮）
+
+![审批截图](screenshots/expense_claim/claims_02_approval.png)
+
+**付款人点击 Pay：**
+- 弹出 Modal，填写付款方式和日期
+- 更新 Notion 中的 Payment Method / Date 字段
+
+**付款完成后：**
+- DM 通知申请人：「你的报销已付款」
+- 自动同步到 Expenses 数据库（关联预算分类 + 月份）
+
+![付款截图](screenshots/expense_claim/claims_03_pay.png)
+
+![反馈通知截图](screenshots/expense_claim/claims_03_feedback.png)
+
 ### 返回结果说明
 
-- 提交成功：返回 Notion 链接 + 发票上传按钮
+- 提交成功：返回 Notion 链接 + 发票上传按钮（可上传最多 5 个文件）
 - 审批结果：通过 DM 通知提交者（Approved / Rejected）
 - 付款完成：通过 DM 通知申请人
+
+### 支持的支出类型
+
+Travel、Office Supplies、Entertainment、Training、Meals、Equipment、Other
 
 ### 流程
 
@@ -152,14 +201,14 @@ Notion 数据查询（反馈 / 报销 / 招聘 / 待办事项）
 员工提交报销（对话 / Modal）
     │
     ▼
-Agent 写入 Notion（Status: Pending）
+Agent 写入 Notion（Approval Status: Pending）
     │
     ▼
 推送审批消息到 #expense-claims（Approve / Reject 按钮）
     │
     ├─ Reject → DM 通知提交者「已拒绝」
     │
-    └─ Approve → 更新 Notion Status = Approved
+    └─ Approve → 更新 Notion Approval Status = Approved
                     │
                     ▼
               DM 通知提交者「已批准」
@@ -190,12 +239,13 @@ Agent 写入 Notion（Status: Pending）
 
 ### 技能说明
 
-在 Slack 中提到候选人信息，Agent 自动提取姓名、职位、来源等字段，确认后写入 Notion 招聘数据库。提交后自动通知 #recruitments 频道和 Interviewer。
+在 Slack 中提到候选人信息，Agent 自动提取姓名、职位、来源、联系方式、面试时间等字段，确认后写入 Notion 招聘数据库。提交后自动通知 #recruitments 频道和 Interviewer。
 
 ### 应用场景
 
 - HR 在群里说：「有个候选人叫张三，应聘 Software Engineer，LinkedIn 上看到的」
 - 面试官推荐：「推荐一个候选人李四，Product Manager，邮箱 lisi@example.com」
+- 安排面试：「张三面试时间定在 4月5日」
 
 ### 使用举例
 
@@ -211,25 +261,28 @@ Agent 写入 Notion（Status: Pending）
 >
 > 确认后我帮你录入到 Notion。
 
+![候选人录入截图](screenshots/recuitment/recruitment.png)
+
 **用户：** 确认
 
 **Agent 回复：**
 > 候选人已录入：[View in Notion](链接)
 > 点击下方按钮上传简历附件。
+> 已通知 #recruitments 频道。
 
 ### 返回结果说明
 
-- 录入成功：返回 Notion 链接 + 简历上传按钮
+- 录入成功：返回 Notion 链接 + 简历上传按钮（可上传 PDF 或链接）
 - 自动通知 #recruitments 频道（含候选人详情）
 - 自动 DM 通知 Interviewer 有新候选人
 
 ### 支持的职位
 
-AI Post-Training Engineer / AI Product Engineer / Full-Stack / International Business Development / Software Engineer / Product Manager / UX Designer / HR Specialist
+AI Post-Training Engineer、AI Product Engineer / Full-Stack、International Business Development、Software Engineer、Product Manager、UX Designer、HR Specialist
 
 ### 支持的简历来源
 
-LinkedIn / Xiaohongshu / Email / Liepin / Other
+LinkedIn、Xiaohongshu、Email、Liepin、Other
 
 ---
 
@@ -275,6 +328,8 @@ LinkedIn / Xiaohongshu / Email / Liepin / Other
 >
 > [Save to Notion] [Cancel]
 
+![讨论总结截图](screenshots/summarize/summary.png)
+
 **用户点击 Save to Notion**
 
 **Agent 回复：**
@@ -286,6 +341,10 @@ LinkedIn / Xiaohongshu / Email / Liepin / Other
 - 点击「Save to Notion」后写入 Docs 数据库，返回 Notion 链接
 - 点击「Cancel」则不保存
 - 文档自动关联作者（Author）和分类（Category）
+
+### 支持的分类
+
+Tech Spec、PRD、Guide、Best Practices、Architecture
 
 ### 流程
 
@@ -346,6 +405,8 @@ Agent 生成结构化总结并展示
 >
 > 确认后我帮你创建到 Notion。
 
+![任务分配截图](screenshots/task/assign_task.png)
+
 **用户：** 确认
 
 **Agent 回复：**
@@ -359,6 +420,8 @@ Agent 生成结构化总结并展示
 
 **Agent 回复（无需确认，直接更新）：**
 > 任务 B1 - PG schema 设计 已更新，状态：In Progress。[View in Notion](链接)
+
+![任务更新截图](screenshots/task/update_task.png)
 
 #### 标记完成
 
@@ -386,6 +449,8 @@ Agent 生成结构化总结并展示
 >
 > 已同步到 Notion：[View in Notion](链接)
 
+![任务进度截图](screenshots/task/task_progress.png)
+
 ### 返回结果说明
 
 - 创建任务：返回 Notion 链接，被分配人收到 DM 通知
@@ -396,8 +461,18 @@ Agent 生成结构化总结并展示
   - 有进度更新但未完成 → Status = In Progress
 - 人员匹配支持三种方式：
   - @mention（如 `@hcs`）
-  - 姓名（如 「分配给 Chu」）
-  - 邮箱（如 「分配给 hcs@example.com」）
+  - 姓名（如「分配给 Chu」）
+  - 邮箱（如「分配给 hcs@example.com」）
+
+### 进度表示例
+
+| 日期 | # | 任务 | 状态 | 今日进展 |
+|---|---|---|---|---|
+| 03-31 | B1 | PG schema 设计 | 🔵 进行中 | wa-bridge.ts 落库，实机验证通过 |
+| 03-31 | C1 | API 接口开发 | ✅ 完成 | 全部接口联调通过 |
+| 03-30 | A2 | 需求文档 | ⬜ 未开始 | - |
+
+**总进度：1/3 完成（33%）**
 
 ---
 
@@ -429,6 +504,8 @@ Agent 生成结构化总结并展示
 **Agent 回复（直接执行，无需确认）：**
 > Human Resources 预算已更新为 $1,000。[View in Notion](链接)
 
+![预算更新截图](screenshots/budget/update_budget.png)
+
 #### 添加支出
 
 **用户：**
@@ -447,6 +524,8 @@ Agent 生成结构化总结并展示
 **Agent 回复：**
 > 支出 MacBook ($200) 已记录到 Equipment Purchases，月份：March 2026。[View in Notion](链接)
 
+![添加支出截图](screenshots/budget/add_expense.png)
+
 #### 查询预算
 
 **用户：**
@@ -458,6 +537,8 @@ Agent 生成结构化总结并展示
 > - 已花费：$650
 > - 占比：65%
 > [View in Notion](链接)
+
+![预算查询截图](screenshots/budget/query.png)
 
 **用户：**
 > 本月总支出
@@ -606,6 +687,48 @@ Agent 能读取频道消息和 Thread 上下文来回答问题，支持搜索频
 
 ---
 
+## Slack Shortcuts（快捷方式）
+
+除了对话式交互，kTeam Agent 还支持通过 Slack Shortcut 快速打开 Modal 表单提交信息。三种 Shortcut 可在 Slack 快捷菜单中触发：
+
+### New Feedback
+
+- **Shortcut ID:** `new_feedback`
+- **Modal 字段：**
+  - Title（标题）- 文本输入
+  - Type（类型）- 下拉选项：Feature Request、Enhancement、Bug Fix、Consultation、Documentation、Performance、Security
+  - Description（描述）- 多行文本
+  - Source（来源）- 下拉选项：Customer Feedback、Internal Proposal、Market Research、Competitive Analysis、User Testing、Support Tickets、Stakeholder Request
+  - Customer（客户）- 文本输入（可选）
+  - Tags（标签）- 多选下拉：Urgent、Key Customer、Technical Debt、Quick Win、Strategic、Compliance、Performance、Security、UX、Integration（可选）
+  - Attachments（附件）- 文件上传（最多 5 个，可选）
+
+### Expense Claim
+
+- **Shortcut ID:** `expense_claim`
+- **Modal 字段：**
+  - Claim Title（报销标题）- 文本输入
+  - Claim Description（报销描述）- 多行文本
+  - Amount (USD)（金额）- 数字输入，支持小数
+  - Expense Type（支出类型）- 下拉选项：Travel、Office Supplies、Entertainment、Training、Meals、Equipment、Other
+  - Attachments（附件）- 文件上传（最多 5 个，可选）
+
+### New Candidate
+
+- **Shortcut ID:** `new_candidate`
+- **Modal 字段：**
+  - Candidate Name（候选人姓名）- 文本输入
+  - Position Applied（应聘职位）- 下拉选项：AI Post-Training Engineer、AI Product Engineer / Full-Stack、International Business Development、Software Engineer、Product Manager、UX Designer、HR Specialist
+  - Resume Link（简历链接）- URL 输入（可选）
+  - Resume（简历）- 文件上传（最多 1 个，可选）
+  - Resume Source（简历来源）- 下拉选项：LinkedIn、Xiaohongshu、Email、Liepin、Other
+  - Phone（电话）- 文本输入（可选）
+  - Email（邮箱）- 邮箱输入（可选）
+  - Interview Time（面试时间）- 日期选择器（可选）
+  - Zoom Meeting Link（Zoom 链接）- URL 输入（可选）
+
+---
+
 ## 快速参考
 
 ### 需要确认后执行的操作
@@ -628,5 +751,5 @@ Agent 能读取频道消息和 Thread 上下文来回答问题，支持搜索频
 |---|---|
 | DM 对话 | 提交反馈、报销、候选人、任务管理、预算管理、查询 |
 | 频道 @Agent | 讨论总结、任务进度表、所有 DM 支持的功能 |
-| Slack Shortcut | New Feedback / New Claim / New Candidate（Modal 表单） |
+| Slack Shortcut | New Feedback / Expense Claim / New Candidate（Modal 表单） |
 | 自动定时 | Daily Digest / Weekly Report / 异常告警 |
