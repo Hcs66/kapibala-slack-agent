@@ -6,6 +6,7 @@ import type {
 } from "@slack/bolt";
 import { updateExpenseClaimStatus } from "~/lib/notion/expense-claim";
 import { syncExpenseClaimToExpenses } from "~/lib/notion/expenses";
+import { toNotionStatus } from "~/lib/workflow-engine/types";
 
 interface ExpenseClaimApprovalValue {
   pageId: string;
@@ -40,7 +41,10 @@ export const expenseClaimApprovalCallback = async ({
     approved,
   } = value;
 
-  const status = approved ? "Approved" : "Rejected";
+  const workflowStatus = approved ? "approved" : "rejected";
+  const status = toNotionStatus("expense_claim", workflowStatus) as
+    | "Approved"
+    | "Rejected";
   const statusEmoji = approved ? "\u2705" : "\u274C";
   const reviewedBy = body.user.id;
   if (body.message?.ts && body.channel?.id) {

@@ -1,1 +1,1 @@
-请仔细阅读kapibala公司分析和kTeam后续迭代建议(ai_input/resources/roadmap_v4.md)，帮我生成一份详细的v4迭代计划
+根据 roadmap_v4(docs/v4/kTeam_roadmap_v4.md), 实现：`Phase 0: 统一工作流内核（P0 — 基础设施）`

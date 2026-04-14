@@ -1,6 +1,7 @@
 import type { AllMiddlewareArgs, SlackViewMiddlewareArgs } from "@slack/bolt";
 import { updateExpenseClaimPayment } from "~/lib/notion/expense-claim";
 import { findNotionUser } from "~/lib/notion/user-map";
+import { canTransition } from "~/lib/workflow-engine/status-machine";
 
 interface ExpenseClaimPayMetadata {
   pageId: string;
@@ -31,6 +32,11 @@ const expenseClaimPayModalCallback = async ({
     const paymentDate = values.payment_date.value.selected_date ?? "";
 
     const payerId = body.user.id;
+
+    if (!canTransition("expense_claim", "approved", "done")) {
+      logger.error("Invalid transition: expense_claim approved → done");
+      return;
+    }
 
     let payerNotionUserId: string | null = null;
     try {
