@@ -1,0 +1,114 @@
+import type {
+  ExpenseClaimRecord,
+  FeedbackRecord,
+  RecruitmentRecord,
+  TaskRecord,
+} from "~/lib/notion/query";
+
+export function formatFeedbackList(items: FeedbackRecord[]): string {
+  if (items.length === 0) return "No feedback items found.";
+  return items
+    .map((f, i) => {
+      const parts = [`${i + 1}. *${f.name}*`];
+      if (f.type) parts.push(`Type: ${f.type}`);
+      if (f.status) parts.push(`Status: ${f.status}`);
+      if (f.priority) parts.push(`Priority: ${f.priority}`);
+      if (f.source) parts.push(`Source: ${f.source}`);
+      if (f.dueDate) parts.push(`Due: ${f.dueDate}`);
+      if (f.tags.length > 0) parts.push(`Tags: ${f.tags.join(", ")}`);
+      parts.push(`<${f.url}|View in Notion>`);
+      return parts.join(" | ");
+    })
+    .join("\n");
+}
+
+export function formatExpenseClaimList(items: ExpenseClaimRecord[]): string {
+  if (items.length === 0) return "No expense claims found.";
+  return items
+    .map((e, i) => {
+      const parts = [`${i + 1}. *${e.claimTitle}*`];
+      if (e.amount != null && e.currency)
+        parts.push(`${e.amount} ${e.currency}`);
+      if (e.expenseType) parts.push(`Type: ${e.expenseType}`);
+      if (e.status) parts.push(`Status: ${e.status}`);
+      if (e.submissionDate) parts.push(`Submitted: ${e.submissionDate}`);
+      parts.push(`<${e.url}|View in Notion>`);
+      return parts.join(" | ");
+    })
+    .join("\n");
+}
+
+export function formatRecruitmentList(items: RecruitmentRecord[]): string {
+  if (items.length === 0) return "No candidates found.";
+  return items
+    .map((r, i) => {
+      const parts = [`${i + 1}. *${r.candidateName}*`];
+      if (r.positionApplied) parts.push(`Position: ${r.positionApplied}`);
+      if (r.status) parts.push(`Status: ${r.status}`);
+      if (r.interviewTime) parts.push(`Interview: ${r.interviewTime}`);
+      parts.push(`<${r.url}|View in Notion>`);
+      return parts.join(" | ");
+    })
+    .join("\n");
+}
+
+export function formatTaskList(items: TaskRecord[]): string {
+  if (items.length === 0) return "No tasks found.";
+  return items
+    .map((t, i) => {
+      const parts = [`${i + 1}. *${t.taskNum}* ${t.name}`];
+      if (t.status) parts.push(`Status: ${t.status}`);
+      if (t.priority) parts.push(`Priority: ${t.priority}`);
+      if (t.dueDate) parts.push(`Due: ${t.dueDate}`);
+      if (t.assignee.length > 0) {
+        const names = t.assignee.map((a) => a.name ?? "Unknown").join(", ");
+        parts.push(`Assignee: ${names}`);
+      }
+      parts.push(`<${t.url}|View in Notion>`);
+      return parts.join(" | ");
+    })
+    .join("\n");
+}
+
+export interface BudgetStatusItem {
+  category: string;
+  monthlyBudget: number | null;
+  spent: number;
+  utilization: number | null;
+  url: string;
+}
+
+export function formatBudgetStatusList(items: BudgetStatusItem[]): string {
+  if (items.length === 0) return "No budget items found.";
+  return items
+    .map((b, i) => {
+      const parts = [`${i + 1}. *${b.category}*`];
+      if (b.monthlyBudget != null) parts.push(`Budget: $${b.monthlyBudget}`);
+      parts.push(`Spent: $${b.spent}`);
+      if (b.utilization != null)
+        parts.push(`Utilization: ${Math.round(b.utilization * 100)}%`);
+      parts.push(`<${b.url}|View in Notion>`);
+      return parts.join(" | ");
+    })
+    .join("\n");
+}
+
+export function formatExpenseList(
+  items: Array<{
+    expense: string;
+    amount: number | null;
+    date: string | null;
+    url: string;
+  }>,
+): string {
+  if (items.length === 0) return "No expenses found.";
+  return items
+    .map((e, i) => {
+      const parts = [`${i + 1}. *${e.expense}*`];
+      if (e.amount != null) parts.push(`$${e.amount}`);
+      if (e.date) parts.push(`Date: ${e.date}`);
+      parts.push(`<${e.url}|View in Notion>`);
+      return parts.join(" | ");
+    })
+    .join("\n");
+}
