@@ -1,13 +1,13 @@
 import type { AllMiddlewareArgs, SlackViewMiddlewareArgs } from "@slack/bolt";
 import { updateExpenseClaimPayment } from "~/lib/notion/expense-claim";
 import { findNotionUser } from "~/lib/notion/user-map";
+import { canTransition } from "~/lib/workflow-engine/status-machine";
 
 interface ExpenseClaimPayMetadata {
   pageId: string;
   pageUrl: string;
   claimTitle: string;
   amount: number;
-  currency: string;
   expenseType: string;
   submitterId: string;
   reviewedBy: string;
@@ -31,6 +31,11 @@ const expenseClaimPayModalCallback = async ({
     const paymentDate = values.payment_date.value.selected_date ?? "";
 
     const payerId = body.user.id;
+
+    if (!canTransition("expense_claim", "approved", "done")) {
+      logger.error("Invalid transition: expense_claim approved → done");
+      return;
+    }
 
     let payerNotionUserId: string | null = null;
     try {
@@ -60,7 +65,7 @@ const expenseClaimPayModalCallback = async ({
             text: {
               type: "mrkdwn",
               text: [
-                `💰 Your expense claim *${metadata.claimTitle}* (${metadata.amount} ${metadata.currency}) has been paid.`,
+                `💰 Your expense claim *${metadata.claimTitle}* ($${metadata.amount}) has been paid.`,
                 `*Payment Method:* ${paymentMethod}`,
                 `*Payment Date:* ${paymentDate}`,
                 `*Paid By:* <@${payerId}>`,
@@ -79,7 +84,7 @@ const expenseClaimPayModalCallback = async ({
             text: {
               type: "mrkdwn",
               text: [
-                `✅ Payment processed for *${metadata.claimTitle}* (${metadata.amount} ${metadata.currency})`,
+                `✅ Payment processed for *${metadata.claimTitle}* ($${metadata.amount})`,
                 `*Payment Method:* ${paymentMethod}`,
                 `*Payment Date:* ${paymentDate}`,
                 `*Notion:* <${metadata.pageUrl}|View in Notion>`,

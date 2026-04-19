@@ -16,8 +16,7 @@ function buildExpenseAlertSection(expenses: OverdueExpense[]): KnownBlock[] {
 
   if (pending.length > 0) {
     const lines = pending.map((e) => {
-      const amount =
-        e.amount !== null ? `${e.amount} ${e.currency ?? ""}`.trim() : "N/A";
+      const amount = e.amount !== null ? `${e.amount}` : "N/A";
       const submitter =
         e.submittedBy.length > 0
           ? (e.submittedBy[0].name ?? "Unknown")
@@ -35,8 +34,7 @@ function buildExpenseAlertSection(expenses: OverdueExpense[]): KnownBlock[] {
 
   if (payment.length > 0) {
     const lines = payment.map((e) => {
-      const amount =
-        e.amount !== null ? `${e.amount} ${e.currency ?? ""}`.trim() : "N/A";
+      const amount = e.amount !== null ? `${e.amount}` : "N/A";
       const submitter =
         e.submittedBy.length > 0
           ? (e.submittedBy[0].name ?? "Unknown")

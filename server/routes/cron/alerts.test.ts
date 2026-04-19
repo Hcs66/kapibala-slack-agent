@@ -45,7 +45,7 @@ const fullDigest: AlertDigest = {
       claimTitle: "Old taxi",
       claimDescription: "",
       amount: 100,
-      currency: "AED",
+
       expenseType: "Travel",
       submissionDate: "2026-03-23",
       status: "Pending",
@@ -59,7 +59,7 @@ const fullDigest: AlertDigest = {
       claimTitle: "Approved claim",
       claimDescription: "",
       amount: 200,
-      currency: "CNY",
+
       expenseType: "Meals",
       submissionDate: "2026-03-24",
       status: "Approved",
@@ -190,7 +190,7 @@ describe("buildAlertBlocks", () => {
           claimTitle: "Anonymous claim",
           claimDescription: "",
           amount: 50,
-          currency: "AED",
+
           expenseType: "Other",
           submissionDate: "2026-03-20",
           status: "Pending",

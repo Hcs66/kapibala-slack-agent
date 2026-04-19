@@ -726,3 +726,196 @@ Agent 收到总结请求后：
 - P2-3: 面试日历 + 提醒 → Google Calendar 集成
 
 ---
+再根据已完成模块和release文档(docs/kTeam_agent_releasenote_v2.md、docs/kTeam_agent_releasenote_v3.md)，生成一份用户使用手册(docs/kTeam_agent_manual.md)，包括：
+
+按技能划分，包括：
+- 技能名称
+- 技能说明
+- 应用场景
+- 使用举例
+- 返回结果说明
+- 流程（如有，例如报销审批）
+
+
+---
+请仔细阅读kapibala公司分析和kTeam后续迭代建议(ai_input/resources/roadmap_v4.md)，帮我生成一份详细的v4迭代计划
+---
+根据 roadmap_v4(docs/v4/kTeam_roadmap_v4.md), 实现：`Phase 1: Skill 架构引入（P0 — 核心架构升级）`:
+
+- `Phase 0: 统一工作流内核（P0 — 基础设施）`已实现
+
+---
+
+根据 roadmap_v4(docs/v4/kTeam_roadmap_v4.md), 实现：`Phase 2: Pending Center — 统一待处理中心`:
+
+- `Phase 0: 统一工作流内核（P0 — 基础设施）`已实现
+- `Phase 1: Skill 架构引入（P0 — 核心架构升级）`已实现
+
+---
+根据 roadmap_v4(docs/v4/kTeam_roadmap_v4.md), 实现：`Phase 4: 决策记录系统`:
+
+- `Phase 0: 统一工作流内核（P0 — 基础设施）`已实现
+- `Phase 1: Skill 架构引入（P0 — 核心架构升级）`已实现
+- `Phase 2: Pending Center — 统一待处理中心（P1）`已实现
+- `Phase 3: 会议纪要 → 任务自动化（P2））`暂不实现
+
+---
+报销流程(expense_claim)从agent中拆分为skill后，流程与之前相比不完整：
+
+## 说明
+- 先确认问题再修改
+
+## 问题
+- 应该是没有调用 `submitExpenseClaim` tool
+
+## 缺少步骤
+- 用户确认后应该将报销信息提交到notion
+- 同步到notion后追问用户是否需要上传发票，显示一个上传按钮
+- 用户提交报销后需要同步给报销审核者审核（通过EXPENSE_CLAIM_APPROVER_EMAIL关联），审核结果需要同步给用户并更新notion状态
+- 报销审核通过后需要同步给付款者（通过EXPENSE_CLAIM_PAYER_EMAIL关联），审核结果同步用户和notion
+
+---
+可以了，顺便检查下skill有没有类似的问题，可以先参考之前的用户手册：docs/kTeam_agent_manual.md
+---
+招聘技能（recruitment）有问题：
+
+## 之前的效果
+
+```
+## 4. 候选人录入
+
+### 技能名称
+
+对话式录入候选人
+
+### 技能说明
+
+在 Slack 中提到候选人信息，Agent 自动提取姓名、职位、来源、联系方式、面试时间等字段，确认后写入 Notion 招聘数据库。提交后自动通知 #recruitments 频道和 Interviewer。
+
+### 应用场景
+
+- HR 在群里说：「有个候选人叫张三，应聘 Software Engineer，LinkedIn 上看到的」
+- 面试官推荐：「推荐一个候选人李四，Product Manager，邮箱 lisi@example.com」
+- 安排面试：「张三面试时间定在 4月5日」
+
+### 使用举例
+
+**用户：**
+> 有个候选人叫张三，应聘 Software Engineer，简历是 LinkedIn 上看到的，邮箱 zhangsan@example.com
+
+**Agent 回复：**
+> 收到，我整理了一下：
+> - *候选人:* 张三
+> - *应聘职位:* Software Engineer
+> - *简历来源:* LinkedIn
+> - *邮箱:* zhangsan@example.com
+>
+> 确认后我帮你录入到 Notion。
+
+![候选人录入截图](screenshots/recuitment/recruitment.png)
+
+**用户：** 确认
+
+**Agent 回复：**
+> 候选人已录入：[View in Notion](链接)
+> 点击下方按钮上传简历附件。
+> 已通知 #recruitments 频道。
+
+### 返回结果说明
+
+- 录入成功：返回 Notion 链接 + 简历上传按钮（可上传 PDF 或链接）
+- 自动通知 #recruitments 频道（含候选人详情）
+- 自动 DM 通知 Interviewer 有新候选人
+
+### 支持的职位
+
+AI Post-Training Engineer、AI Product Engineer / Full-Stack、International Business Development、Software Engineer、Product Manager、UX Designer、HR Specialist
+
+### 支持的简历来源
+
+LinkedIn、Xiaohongshu、Email、Liepin、Other
+```
+
+## 实际效果
+agent返回：
+```
+收到，候选人信息：
+姓名： 张三
+应聘职位： Software Engineer
+来源： LinkedIn
+请问你需要我帮你做什么？比如：
+:memo: 记录到某个地方
+:loudspeaker: 分享到某个频道
+:question: 其他需求
+
+```
+---
+目前已经能够识别和使用对应的招聘skill，需要继续优化：
+
+- 优化反应速度，目前由llm做skill路由的速度还是有点慢，看看有没有优化空间
+- 优化判断逻辑，如果匹配度够高，直接调用skill，无需二次确认，目前返回了如下的二次确认信息:
+```
+收到，你是想记录候选人信息吗？
+这条信息看起来像是招聘相关的候选人资料，不属于产品反馈（Bug/功能需求等）的范畴。
+请问你需要我帮你做什么呢？比如：
+记录候选人信息 — 保存到 Notion 的招聘流程中
+提交反馈/问题 — 如果是关于招聘系统的 Bug 或改进建议
+其他 — 请说明具体需求
+请告诉我你的意图，我来帮你处理 :blush:
+```
+---
+询问：“我今天要做什么“时，返回如下错误提示：
+
+```
+抱歉，暂时无法获取您的待办事项。系统遇到了一个数据源配置问题（Currency 属性错误）。
+建议您：
+联系管理员检查 Notion 数据源配置
+或稍后再试
+您可以直接告诉我需要什么帮助，我会尽力协助您。
+```
+
+继续，检查下 roadmap_v4(docs/v4/kTeam_roadmap_v4.md)中的 `Phase 2: Pending Center — 统一待处理中心` 实现
+
+---
+根据 roadmap_v4(docs/v4/kTeam_roadmap_v4.md), 实现：`Phase 3: 会议纪要 → 任务自动化（P2））`:
+
+- `Phase 0: 统一工作流内核（P0 — 基础设施）`已实现
+- `Phase 1: Skill 架构引入（P0 — 核心架构升级）`已实现
+- `Phase 2: Pending Center — 统一待处理中心（P1）`已实现
+- `Phase 4: 决策记录系统`已实现
+---
+目前在报销流程中，APPROVER和PAYER是通过env硬编码传入的email地址来匹配，短期内这个相对固定问题不大，有没有更好的方案能够支持灵活场景，比如默认是env的配置，也支持临时调整，比如在报销时说：让@hcs 来处理付款，然后搜索对应用户 
+---
+
+根据 roadmap_v4(docs/v4/kTeam_roadmap_v4.md), 实现：`Phase 5: Knowledge Skill — 团队知识问答`:
+
+- `Phase 0: 统一工作流内核（P0 — 基础设施）`已实现
+- `Phase 1: Skill 架构引入（P0 — 核心架构升级）`已实现
+- `Phase 2: Pending Center — 统一待处理中心（P1）`已实现
+- `Phase 3: 会议纪要 → 任务自动化（P2）））`已实现
+- `Phase 4: 决策记录系统`已实现
+
+---
+输入：`查一下产品文档`，返回如下提示，应该是没有到notion搜索，检查下实现：
+```
+
+抱歉，我在团队知识库中没有找到产品相关文档。可能的原因：
+产品文档尚未同步到知识库 — 文档可能在其他位置（如 Confluence、Google Docs 等）
+文档命名方式不同 — 知识库中的文档可能使用了其他关键词
+建议你可以：
+联系产品团队确认文档存放位置
+在 Slack 中询问是否有产品文档频道
+检查公司内部的文档管理平台
+需要我帮你搜索 Slack 中的产品相关频道吗？ (edited) 
+[10:56 AM]Hi, how can I help?
+[10:57 AM]抱歉，在团队知识库中没有找到产品相关文档。可能的原因：
+产品文档尚未同步到知识库 — 文档可能在其他位置（如 Confluence、Google Docs 等）
+文档命名方式不同 — 知识库中的文档可能使用了其他关键词
+建议你可以：
+联系产品团队确认文档存放位置
+在 Slack 中询问是否有产品文档频道
+检查公司内部的文档管理平台
+需要我帮你搜索 Slack 中的产品相关频道吗？
+```
+
+---

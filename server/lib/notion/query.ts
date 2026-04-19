@@ -107,7 +107,6 @@ export interface ExpenseClaimRecord {
   claimTitle: string;
   claimDescription: string;
   amount: number | null;
-  currency: string | null;
   expenseType: string | null;
   submissionDate: string | null;
   status: string | null;
@@ -141,6 +140,44 @@ export interface TaskRecord {
   updatedAt: string | null;
 }
 
+export interface DocRecord {
+  id: string;
+  url: string;
+  docName: string;
+  summary: string;
+  category: string[];
+  author: Array<{ id: string; name: string | null }>;
+  createdAt: string | null;
+}
+
+export function parseDocPage(page: PageObjectResponse): DocRecord {
+  const p = page.properties;
+  return {
+    id: page.id,
+    url: page.url,
+    docName: extractTitle(p["Doc name"]),
+    summary: extractRichText(p.Summary),
+    category: extractMultiSelect(p.Category),
+    author: extractPeople(p.Author),
+    createdAt: page.created_time,
+  };
+}
+
+export interface DecisionRecord {
+  id: string;
+  url: string;
+  title: string;
+  content: string;
+  reason: string;
+  decisionMaker: Array<{ id: string; name: string | null }>;
+  impactScope: string[];
+  priority: string | null;
+  status: string | null;
+  category: string | null;
+  date: string | null;
+  createdAt: string | null;
+}
+
 export function parseFeedbackPage(page: PageObjectResponse): FeedbackRecord {
   const p = page.properties;
   return {
@@ -171,7 +208,6 @@ export function parseExpenseClaimPage(
     claimTitle: extractTitle(p["Claim Title"]),
     claimDescription: extractRichText(p["Claim Description"]),
     amount: extractNumber(p.Amount),
-    currency: extractSelect(p.Currency),
     expenseType: extractSelect(p["Expense Type"]),
     submissionDate: extractDate(p["Submission Date"]),
     status: extractStatus(p["Status"]),
@@ -211,6 +247,24 @@ export function parseTaskPage(page: PageObjectResponse): TaskRecord {
     assignee: extractPeople(p.Assignee),
     dueDate: extractDate(p["Due date"]),
     updatedAt: page.last_edited_time,
+  };
+}
+
+export function parseDecisionPage(page: PageObjectResponse): DecisionRecord {
+  const p = page.properties;
+  return {
+    id: page.id,
+    url: page.url,
+    title: extractTitle(p["Decision Title"]),
+    content: extractRichText(p["Decision Content"]),
+    reason: extractRichText(p.Reason),
+    decisionMaker: extractPeople(p["Decision Maker"]),
+    impactScope: extractMultiSelect(p["Impact Scope"]),
+    priority: extractSelect(p.Priority),
+    status: extractStatus(p.Status) ?? extractSelect(p.Status) ?? null,
+    category: extractSelect(p.Category),
+    date: extractDate(p.Date),
+    createdAt: page.created_time,
   };
 }
 
@@ -342,7 +396,6 @@ export async function queryExpenseClaims(filters?: {
       "Claim Title",
       "Claim Description",
       "Amount",
-      "Currency",
       "Expense Type",
       "Submission Date",
       "Status",
@@ -658,4 +711,123 @@ export async function queryExpenses(filters?: {
   });
 
   return response.results.filter(isFullPage).map(parseExpensePage);
+}
+
+export async function queryDocs(filters?: {
+  keyword?: string;
+  category?: string;
+}): Promise<DocRecord[]> {
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
+  const dataSourceId = process.env.NOTION_DOCS_DATASOURCE_ID;
+  if (!dataSourceId) {
+    throw new Error("NOTION_DOCS_DATASOURCE_ID is not configured");
+  }
+
+  const conditions: Array<Record<string, unknown>> = [];
+
+  if (filters?.keyword) {
+    conditions.push({
+      property: "Doc name",
+      title: { contains: filters.keyword },
+    });
+  }
+  if (filters?.category) {
+    conditions.push({
+      property: "Category",
+      multi_select: { contains: filters.category },
+    });
+  }
+
+  const filter =
+    conditions.length > 1
+      ? { and: conditions }
+      : conditions.length === 1
+        ? conditions[0]
+        : undefined;
+
+  const response = await notion.dataSources.query({
+    data_source_id: dataSourceId,
+    filter: filter as Parameters<typeof notion.dataSources.query>[0]["filter"],
+    sorts: [{ timestamp: "created_time", direction: "descending" }],
+    filter_properties: ["Doc name", "Summary", "Category", "Author"],
+    page_size: 20,
+  });
+
+  return response.results.filter(isFullPage).map(parseDocPage);
+}
+
+export async function queryDecisions(filters?: {
+  category?: string;
+  status?: string;
+  decisionMakerNotionUserId?: string;
+  keyword?: string;
+  afterDate?: string;
+}): Promise<DecisionRecord[]> {
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
+  const dataSourceId = process.env.NOTION_DECISIONS_DATASOURCE_ID;
+  if (!dataSourceId) {
+    throw new Error("NOTION_DECISIONS_DATASOURCE_ID is not configured");
+  }
+
+  const conditions: Array<Record<string, unknown>> = [];
+
+  if (filters?.category) {
+    conditions.push({
+      property: "Category",
+      select: { equals: filters.category },
+    });
+  }
+  if (filters?.status) {
+    conditions.push({
+      property: "Status",
+      status: { equals: filters.status },
+    });
+  }
+  if (filters?.decisionMakerNotionUserId) {
+    conditions.push({
+      property: "Decision Maker",
+      people: { contains: filters.decisionMakerNotionUserId },
+    });
+  }
+  if (filters?.keyword) {
+    conditions.push({
+      property: "Decision Title",
+      title: { contains: filters.keyword },
+    });
+  }
+  if (filters?.afterDate) {
+    conditions.push({
+      property: "Date",
+      date: { on_or_after: filters.afterDate },
+    });
+  }
+
+  const filter =
+    conditions.length > 1
+      ? { and: conditions }
+      : conditions.length === 1
+        ? conditions[0]
+        : undefined;
+
+  const response = await notion.dataSources.query({
+    data_source_id: dataSourceId,
+    filter: filter as Parameters<typeof notion.dataSources.query>[0]["filter"],
+    sorts: [{ property: "Date", direction: "descending" }],
+    filter_properties: [
+      "Decision Title",
+      "Decision Content",
+      "Reason",
+      "Decision Maker",
+      "Impact Scope",
+      "Priority",
+      "Status",
+      "Category",
+      "Date",
+    ],
+    page_size: 20,
+  });
+
+  return response.results.filter(isFullPage).map(parseDecisionPage);
 }

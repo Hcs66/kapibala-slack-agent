@@ -1,11 +1,11 @@
+import type { SLACheckInput } from "~/lib/workflow-engine/sla";
+import { checkSLAViolations, DEFAULT_SLA } from "~/lib/workflow-engine/sla";
 import type {
   ExpenseClaimRecord,
   FeedbackRecord,
   RecruitmentRecord,
 } from "./query";
 import { queryExpenseClaims, queryFeedback, queryRecruitment } from "./query";
-
-const OVERDUE_DAYS = 3;
 
 export interface OverdueExpense extends ExpenseClaimRecord {
   daysOverdue: number;
@@ -38,21 +38,18 @@ export function getDaysOverdue(
   return diffDays;
 }
 
-function filterOverdueExpenses(
+function expensesToSLAInputs(
   expenses: ExpenseClaimRecord[],
-  alertReason: "pending_approval" | "pending_payment",
-  now: Date,
-): OverdueExpense[] {
-  return expenses
-    .filter((e) => {
-      const days = getDaysOverdue(e.submissionDate, now);
-      return days !== null && days >= OVERDUE_DAYS;
-    })
-    .map((e) => ({
-      ...e,
-      daysOverdue: getDaysOverdue(e.submissionDate, now) as number,
-      alertReason,
-    }));
+  status: "pending" | "approved",
+): SLACheckInput[] {
+  return expenses.map((e) => ({
+    entityType: "expense_claim" as const,
+    entityId: e.id,
+    entityTitle: e.claimTitle,
+    entityUrl: e.url,
+    status,
+    statusSinceDate: e.submissionDate,
+  }));
 }
 
 export async function getAlertDigest(now = new Date()): Promise<AlertDigest> {
@@ -68,34 +65,89 @@ export async function getAlertDigest(now = new Date()): Promise<AlertDigest> {
     queryFeedback({ status: "Pending" }),
   ]);
 
-  const overdueExpenses = [
-    ...filterOverdueExpenses(pendingExpenses, "pending_approval", now),
-    ...filterOverdueExpenses(approvedExpenses, "pending_payment", now),
+  const allSLAInputs: SLACheckInput[] = [
+    ...expensesToSLAInputs(pendingExpenses, "pending"),
+    ...expensesToSLAInputs(approvedExpenses, "approved"),
+    ...pendingRecruitment.map((r) => ({
+      entityType: "recruitment" as const,
+      entityId: r.id,
+      entityTitle: r.candidateName,
+      entityUrl: r.url,
+      status: "pending" as const,
+      statusSinceDate: r.interviewTime,
+    })),
+    ...pendingFeedback.map((f) => ({
+      entityType: "feedback" as const,
+      entityId: f.id,
+      entityTitle: f.name,
+      entityUrl: f.url,
+      status: "pending" as const,
+      statusSinceDate: f.createdDate,
+    })),
   ];
 
-  const overdueRecruitment = pendingRecruitment
-    .filter((r) => {
-      const days = getDaysOverdue(r.interviewTime, now);
-      if (days !== null) return days >= OVERDUE_DAYS;
-      // No interview time — use page created_time approximation via status
-      // Since RecruitmentRecord doesn't have a created date, we can't filter
-      // by age. Include all pending review items as a fallback.
-      return true;
-    })
-    .map((r) => ({
-      ...r,
-      daysOverdue: getDaysOverdue(r.interviewTime, now) ?? OVERDUE_DAYS,
-    }));
+  const violations = checkSLAViolations(allSLAInputs, DEFAULT_SLA, now);
 
-  const overdueFeedback = pendingFeedback
-    .filter((f) => {
-      const days = getDaysOverdue(f.createdDate, now);
-      return days !== null && days >= OVERDUE_DAYS;
-    })
-    .map((f) => ({
-      ...f,
-      daysOverdue: getDaysOverdue(f.createdDate, now) as number,
-    }));
+  const expenseById = new Map(
+    [...pendingExpenses, ...approvedExpenses].map((e) => [e.id, e]),
+  );
+  const recruitmentById = new Map(pendingRecruitment.map((r) => [r.id, r]));
+  const feedbackById = new Map(pendingFeedback.map((f) => [f.id, f]));
+
+  const overdueExpenses: OverdueExpense[] = [];
+  const overdueRecruitment: OverdueRecruitment[] = [];
+  const overdueFeedback: OverdueFeedback[] = [];
+
+  for (const v of violations) {
+    const daysOverdue =
+      (Math.floor(v.hoursOverdue / 24) ||
+        getDaysOverdue(
+          allSLAInputs.find((i) => i.entityId === v.entityId)
+            ?.statusSinceDate ?? null,
+          now,
+        )) ??
+      0;
+
+    if (v.entityType === "expense_claim") {
+      const record = expenseById.get(v.entityId);
+      if (record) {
+        const alertReason =
+          v.status === "pending" ? "pending_approval" : "pending_payment";
+        overdueExpenses.push({
+          ...record,
+          daysOverdue: getDaysOverdue(record.submissionDate, now) as number,
+          alertReason,
+        });
+      }
+    } else if (v.entityType === "recruitment") {
+      const record = recruitmentById.get(v.entityId);
+      if (record) {
+        overdueRecruitment.push({
+          ...record,
+          daysOverdue: getDaysOverdue(record.interviewTime, now) ?? daysOverdue,
+        });
+      }
+    } else if (v.entityType === "feedback") {
+      const record = feedbackById.get(v.entityId);
+      if (record) {
+        overdueFeedback.push({
+          ...record,
+          daysOverdue: getDaysOverdue(record.createdDate, now) as number,
+        });
+      }
+    }
+  }
+
+  // Recruitment items with no interview time are included as fallback
+  // (same behavior as before — SLA engine skips null dates)
+  for (const r of pendingRecruitment) {
+    if (!r.interviewTime && !overdueRecruitment.some((o) => o.id === r.id)) {
+      overdueRecruitment.push({
+        ...r,
+        daysOverdue: 3,
+      });
+    }
+  }
 
   return {
     overdueExpenses,

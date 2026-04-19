@@ -1,0 +1,62 @@
+import type { Skill } from "~/lib/skills/types";
+import { knowledgePrompt } from "./prompt";
+import { knowledgeTools } from "./tools";
+
+export const knowledgeSkill: Skill = {
+  name: "knowledge",
+  description:
+    "Search team knowledge base (docs, decisions) and answer questions about past discussions, documentation, and organizational knowledge",
+  triggerPatterns: [
+    "知识库",
+    "knowledge",
+    "文档",
+    "document",
+    "我们.*讨论.*什么",
+    "我们.*说.*什么",
+    "上次.*讨论",
+    "之前.*讨论",
+    "有没有.*文档",
+    "有没有.*记录",
+    "查.*文档",
+    "找.*文档",
+    "搜索.*文档",
+    "search.*doc",
+    "find.*doc",
+    "what.*discuss",
+    "what.*talk.*about",
+    "previous.*discussion",
+    "past.*discussion",
+    "do we have.*doc",
+    "is there.*doc",
+    "关于.*的资料",
+    "关于.*的文档",
+    "有.*相关.*资料",
+    "查一下",
+    "帮我找",
+    "look up",
+    "look.*for.*info",
+    "what do we know about",
+    "操作手册",
+    "manual",
+    "guide",
+    "指南",
+    "PRD",
+    "技术文档",
+    "tech.*spec",
+    "architecture.*doc",
+  ],
+  systemPrompt: knowledgePrompt,
+  tools: knowledgeTools,
+  resources: [
+    {
+      type: "notion_database",
+      name: "Docs",
+      envKey: "NOTION_DOCS_DATASOURCE_ID",
+    },
+    {
+      type: "notion_database",
+      name: "Decisions",
+      envKey: "NOTION_DECISIONS_DATASOURCE_ID",
+    },
+  ],
+};

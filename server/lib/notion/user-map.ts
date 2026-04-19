@@ -21,3 +21,17 @@ export async function findNotionUser(email: string): Promise<string | null> {
   const user = users.find((u) => u.person?.email === email);
   return user ? user.id : null;
 }
+
+export async function getAllNotionPersonUsers(): Promise<
+  Array<{ notionUserId: string; email: string }>
+> {
+  const users = await loadUsers();
+  const result: Array<{ notionUserId: string; email: string }> = [];
+  for (const u of users) {
+    const email = u.person?.email;
+    if (email) {
+      result.push({ notionUserId: u.id, email });
+    }
+  }
+  return result;
+}

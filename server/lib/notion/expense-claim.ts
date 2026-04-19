@@ -1,5 +1,6 @@
 import type {
   CreatePageParameters,
+  PageObjectResponse,
   UpdatePageParameters,
 } from "@notionhq/client/build/src/api-endpoints";
 
@@ -48,6 +49,18 @@ export async function createExpenseClaim(data: ExpenseClaimData) {
   if (data.submittedByNotionUserId) {
     properties["Submitted By"] = {
       people: [{ id: data.submittedByNotionUserId }],
+    };
+  }
+
+  if (data.approverNotionUserId) {
+    properties.Approver = {
+      people: [{ id: data.approverNotionUserId }],
+    };
+  }
+
+  if (data.payerNotionUserId) {
+    properties.Payer = {
+      people: [{ id: data.payerNotionUserId }],
     };
   }
 
@@ -150,4 +163,21 @@ export async function updateExpenseClaimPayment(
     page_id: pageId,
     properties,
   });
+}
+
+export async function getExpenseClaimPayer(
+  pageId: string,
+): Promise<string | null> {
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
+
+  const page = (await notion.pages.retrieve({
+    page_id: pageId,
+  })) as PageObjectResponse;
+
+  const payerProp = page.properties.Payer;
+  if (payerProp?.type === "people" && payerProp.people.length > 0) {
+    return payerProp.people[0].id;
+  }
+  return null;
 }

@@ -1,6 +1,7 @@
 import type { KnownBlock } from "@slack/web-api";
-import type { DailyDigest } from "~/lib/notion/aggregation";
-import { getDailyDigest } from "~/lib/notion/aggregation";
+import type { DailyDigest, PendingCategory } from "~/lib/notion/aggregation";
+import { getDailyDigest, getUserPendingItems } from "~/lib/notion/aggregation";
+import type { WorkflowEntity } from "~/lib/workflow-engine/types";
 
 function buildExpenseSection(
   title: string,
@@ -20,8 +21,7 @@ function buildExpenseSection(
   }
 
   const lines = expenses.map((e) => {
-    const amount =
-      e.amount !== null ? `${e.amount} ${e.currency ?? ""}`.trim() : "N/A";
+    const amount = e.amount !== null ? `$${e.amount}` : "N/A";
     const submitter =
       e.submittedBy.length > 0
         ? (e.submittedBy[0].name ?? "Unknown")
@@ -98,6 +98,107 @@ function buildFeedbackSection(digest: DailyDigest): KnownBlock[] {
   ];
 }
 
+const CATEGORY_LABEL: Record<PendingCategory, string> = {
+  expense_approval: "🔴 Pending Approval",
+  expense_payment: "🟡 Awaiting Payment",
+  recruitment: "👤 Recruitment",
+  feedback: "💬 Feedback",
+  task: "📋 Tasks",
+};
+
+function buildPersonalPendingBlocks(
+  items: WorkflowEntity[],
+  countByCategory: Record<PendingCategory, number>,
+): KnownBlock[] {
+  if (items.length === 0) return [];
+
+  const summaryParts: string[] = [];
+  for (const [cat, count] of Object.entries(countByCategory)) {
+    if (count > 0) {
+      const label = CATEGORY_LABEL[cat as PendingCategory] ?? cat;
+      summaryParts.push(`${label}: ${count}`);
+    }
+  }
+
+  const itemLines = items.slice(0, 15).map((item) => {
+    const parts = [`• <${item.notionPageUrl}|${item.title}>`];
+    if (item.priority) parts.push(`_${item.priority}_`);
+    if (item.dueDate) {
+      const isOverdue = item.dueDate < new Date().toISOString().split("T")[0];
+      parts.push(isOverdue ? `⚠️ Due: ${item.dueDate}` : `Due: ${item.dueDate}`);
+    }
+    return parts.join("  ·  ");
+  });
+
+  const overflow =
+    items.length > 15 ? `\n_...and ${items.length - 15} more_` : "";
+
+  return [
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*Your pending items (${items.length}):*\n${summaryParts.join("\n")}\n\n${itemLines.join("\n")}${overflow}`,
+      },
+    },
+  ];
+}
+
+async function sendPersonalDigests(
+  client: import("@slack/web-api").WebClient,
+): Promise<number> {
+  const { getAllNotionPersonUsers } = await import("~/lib/notion/user-map");
+
+  const notionUsers = await getAllNotionPersonUsers();
+  let dmsSent = 0;
+
+  for (const { notionUserId, email } of notionUsers) {
+    try {
+      const result = await getUserPendingItems(notionUserId);
+      if (result.total === 0) continue;
+
+      const slackUser = await client.users.lookupByEmail({ email });
+      const slackUserId = slackUser.user?.id;
+      if (!slackUserId) continue;
+
+      const blocks: KnownBlock[] = [
+        {
+          type: "header",
+          text: {
+            type: "plain_text",
+            text: "📋 Your Daily Pending Summary",
+            emoji: true,
+          },
+        },
+        ...buildPersonalPendingBlocks(result.items, result.countByCategory),
+        {
+          type: "context",
+          elements: [
+            {
+              type: "mrkdwn",
+              text: `Generated on ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}`,
+            },
+          ],
+        },
+      ];
+
+      await client.chat.postMessage({
+        channel: slackUserId,
+        blocks,
+        text: `You have ${result.total} pending item(s) today.`,
+      });
+      dmsSent++;
+    } catch (error) {
+      console.warn(
+        `Failed to send personal digest to ${email}:`,
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+
+  return dmsSent;
+}
+
 export default defineEventHandler(async (event) => {
   const authHeader = getHeader(event, "authorization");
 
@@ -154,7 +255,9 @@ export default defineEventHandler(async (event) => {
       text: `Daily Digest: ${totalItems} items need attention`,
     });
 
-    return { success: true, totalItems };
+    const dmsSent = await sendPersonalDigests(client);
+
+    return { success: true, totalItems, dmsSent };
   } catch (error) {
     console.error("Daily digest failed:", error);
     return {

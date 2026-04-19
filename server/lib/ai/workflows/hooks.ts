@@ -20,3 +20,9 @@ export const saveDocApprovalHook = defineHook({
     approved: z.boolean(),
   }),
 });
+
+export const meetingActionItemsApprovalHook = defineHook({
+  schema: z.object({
+    approved: z.boolean(),
+  }),
+});

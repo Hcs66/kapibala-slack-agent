@@ -4,16 +4,20 @@ import type {
   ButtonAction,
   SlackActionMiddlewareArgs,
 } from "@slack/bolt";
-import { updateExpenseClaimStatus } from "~/lib/notion/expense-claim";
+import {
+  getExpenseClaimPayer,
+  updateExpenseClaimStatus,
+} from "~/lib/notion/expense-claim";
 import { syncExpenseClaimToExpenses } from "~/lib/notion/expenses";
 import { findNotionUser } from "~/lib/notion/user-map";
+import { resolveSlackUserByNotionId } from "~/lib/slack/user-resolver";
+import { toNotionStatus } from "~/lib/workflow-engine/types";
 
 interface ExpenseClaimAgentApprovalValue {
   pageId: string;
   pageUrl: string;
   claimTitle: string;
   amount: number;
-  currency: string;
   expenseType: string;
   submitterId: string;
   approved: boolean;
@@ -35,13 +39,15 @@ export const expenseClaimAgentApprovalCallback = async ({
     pageUrl,
     claimTitle,
     amount,
-    currency,
     expenseType,
     submitterId,
     approved,
   } = value;
 
-  const status = approved ? "Approved" : "Rejected";
+  const workflowStatus = approved ? "approved" : "rejected";
+  const status = toNotionStatus("expense_claim", workflowStatus) as
+    | "Approved"
+    | "Rejected";
   const statusEmoji = approved ? "\u2705" : "\u274C";
   const reviewedBy = body.user.id;
 
@@ -59,7 +65,7 @@ export const expenseClaimAgentApprovalCallback = async ({
             text: [
               `\u23F3 *Expense Claim Processing (${status})...*`,
               `*Claim Title:* ${claimTitle}`,
-              `*Amount:* ${amount} ${currency}`,
+              `*Amount:* ${amount}`,
               `*Expense Type:* ${expenseType}`,
               `*Submitted By:* <@${submitterId}>`,
               `*Reviewed By:* <@${reviewedBy}>`,
@@ -100,7 +106,7 @@ export const expenseClaimAgentApprovalCallback = async ({
             text: {
               type: "mrkdwn",
               text: [
-                `${statusEmoji} Your expense claim *${claimTitle}* (${amount} ${currency}) has been *${status}* by <@${reviewedBy}>.`,
+                `${statusEmoji} Your expense claim *${claimTitle}* ($${amount}) has been *${status}* by <@${reviewedBy}>.`,
                 `*Notion:* <${pageUrl}|View in Notion>`,
               ].join("\n"),
             },
@@ -110,70 +116,88 @@ export const expenseClaimAgentApprovalCallback = async ({
     ];
 
     if (approved) {
-      const payerEmail = process.env.EXPENSE_CLAIM_PAYER_EMAIL;
-      if (payerEmail) {
-        try {
-          const lookupResult = await client.users.lookupByEmail({
-            email: payerEmail,
-          });
-          const payerSlackId = lookupResult.user?.id;
-          if (payerSlackId) {
-            const payButtonValue = JSON.stringify({
-              pageId,
-              pageUrl,
-              claimTitle,
-              amount,
-              currency,
-              expenseType,
-              submitterId,
-              reviewedBy,
-            });
+      let payerSlackId: string | null = null;
 
-            promises.push(
-              client.chat.postMessage({
-                channel: payerSlackId,
-                text: `New approved expense claim: ${claimTitle}`,
-                blocks: [
+      // 1. Check if payer was pre-set on the Notion claim (override)
+      try {
+        const payerNotionUserId = await getExpenseClaimPayer(pageId);
+        if (payerNotionUserId) {
+          payerSlackId = await resolveSlackUserByNotionId(
+            client.token as string,
+            payerNotionUserId,
+          );
+        }
+      } catch (error) {
+        console.warn("Failed to read payer from Notion claim:", error);
+      }
+
+      // 2. Fall back to env var
+      if (!payerSlackId) {
+        const payerEmail = process.env.EXPENSE_CLAIM_PAYER_EMAIL;
+        if (payerEmail) {
+          try {
+            const lookupResult = await client.users.lookupByEmail({
+              email: payerEmail,
+            });
+            payerSlackId = lookupResult.user?.id ?? null;
+          } catch (error) {
+            console.warn("Failed to lookup payer by email:", payerEmail, error);
+          }
+        }
+      }
+
+      if (payerSlackId) {
+        const payButtonValue = JSON.stringify({
+          pageId,
+          pageUrl,
+          claimTitle,
+          amount,
+          expenseType,
+          submitterId,
+          reviewedBy,
+        });
+
+        promises.push(
+          client.chat.postMessage({
+            channel: payerSlackId,
+            text: `New approved expense claim: ${claimTitle}`,
+            blocks: [
+              {
+                type: "header",
+                text: {
+                  type: "plain_text",
+                  text: "New Approved Expense Claim",
+                },
+              },
+              {
+                type: "section",
+                text: {
+                  type: "mrkdwn",
+                  text: [
+                    `*Claim Title:* ${claimTitle}`,
+                    `*Amount:* ${amount}`,
+                    `*Expense Type:* ${expenseType}`,
+                    `*Submitted By:* <@${submitterId}>`,
+                    `*Approved By:* <@${reviewedBy}>`,
+                    `*Notion:* <${pageUrl}|View in Notion>`,
+                  ].join("\n"),
+                },
+              },
+              {
+                type: "actions",
+                elements: [
                   {
-                    type: "header",
-                    text: {
-                      type: "plain_text",
-                      text: "New Approved Expense Claim",
-                    },
-                  },
-                  {
-                    type: "section",
-                    text: {
-                      type: "mrkdwn",
-                      text: [
-                        `*Claim Title:* ${claimTitle}`,
-                        `*Amount:* ${amount} ${currency}`,
-                        `*Expense Type:* ${expenseType}`,
-                        `*Submitted By:* <@${submitterId}>`,
-                        `*Approved By:* <@${reviewedBy}>`,
-                        `*Notion:* <${pageUrl}|View in Notion>`,
-                      ].join("\n"),
-                    },
-                  },
-                  {
-                    type: "actions",
-                    elements: [
-                      {
-                        type: "button",
-                        text: { type: "plain_text", text: "Pay", emoji: true },
-                        style: "primary",
-                        action_id: "expense_claim_pay",
-                        value: payButtonValue,
-                      },
-                    ],
+                    type: "button",
+                    text: { type: "plain_text", text: "Pay", emoji: true },
+                    style: "primary",
+                    action_id: "expense_claim_pay",
+                    value: payButtonValue,
                   },
                 ],
-              }),
-            );
-          }
-        } catch (error) {
-          console.warn("Failed to lookup payer by email:", payerEmail, error);
-        }
+              },
+            ],
+          }),
+        );
       }
     }
 
@@ -204,7 +228,7 @@ export const expenseClaimAgentApprovalCallback = async ({
               text: [
                 `${statusEmoji} *Expense Claim ${status}*`,
                 `*Claim Title:* ${claimTitle}`,
-                `*Amount:* ${amount} ${currency}`,
+                `*Amount:* ${amount}`,
                 `*Expense Type:* ${expenseType}`,
                 `*Submitted By:* <@${submitterId}>`,
                 `*Reviewed By:* <@${reviewedBy}>`,
@@ -231,7 +255,7 @@ export const expenseClaimAgentApprovalCallback = async ({
               text: [
                 `\u26A0\uFE0F *Expense Claim ${status} (Sync Failed)*`,
                 `*Claim Title:* ${claimTitle}`,
-                `*Amount:* ${amount} ${currency}`,
+                `*Amount:* ${amount}`,
                 `*Expense Type:* ${expenseType}`,
                 `*Submitted By:* <@${submitterId}>`,
                 `*Reviewed By:* <@${reviewedBy}>`,

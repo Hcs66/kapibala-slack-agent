@@ -1,4 +1,4 @@
-import { queryExpenseClaims, queryFeedback, queryRecruitment } from "./query";
+import type { WorkflowEntity } from "~/lib/workflow-engine/types";
 
 export interface WeeklyStats {
   feedbackCount: number;
@@ -12,7 +12,6 @@ export interface DailyDigest {
     url: string;
     claimTitle: string;
     amount: number | null;
-    currency: string | null;
     submittedBy: Array<{ id: string; name: string | null }>;
   }>;
   approvedExpenses: Array<{
@@ -20,7 +19,6 @@ export interface DailyDigest {
     url: string;
     claimTitle: string;
     amount: number | null;
-    currency: string | null;
     submittedBy: Array<{ id: string; name: string | null }>;
   }>;
   pendingRecruitment: Array<{
@@ -42,6 +40,10 @@ export interface DailyDigest {
 }
 
 export async function getWeeklyStats(): Promise<WeeklyStats> {
+  const { queryFeedback, queryExpenseClaims, queryRecruitment } = await import(
+    "~/lib/notion/query"
+  );
+
   const now = new Date();
   const weekStart = new Date(now);
   weekStart.setDate(now.getDate() - now.getDay() + 1);
@@ -74,7 +76,148 @@ export async function getWeeklyStats(): Promise<WeeklyStats> {
   };
 }
 
+export type PendingCategory =
+  | "expense_approval"
+  | "expense_payment"
+  | "recruitment"
+  | "feedback"
+  | "task";
+
+const ALL_PENDING_CATEGORIES: PendingCategory[] = [
+  "expense_approval",
+  "expense_payment",
+  "recruitment",
+  "feedback",
+  "task",
+];
+
+export interface UserPendingResult {
+  items: WorkflowEntity[];
+  countByCategory: Record<PendingCategory, number>;
+  total: number;
+}
+
+/**
+ * Query all pending items for a specific user across all modules.
+ * Queries run in parallel for performance.
+ *
+ * @param notionUserId - The Notion user ID to filter by (owner/assignee)
+ * @param categories - Optional subset of categories to query. Defaults to all.
+ */
+export async function getUserPendingItems(
+  notionUserId: string | null,
+  categories?: PendingCategory[],
+): Promise<UserPendingResult> {
+  const { queryExpenseClaims, queryFeedback, queryRecruitment, queryTasks } =
+    await import("~/lib/notion/query");
+  const {
+    expenseClaimToEntity,
+    feedbackToEntity,
+    recruitmentToEntity,
+    taskToEntity,
+  } = await import("~/lib/workflow-engine/adapters");
+
+  const cats = categories ?? ALL_PENDING_CATEGORIES;
+
+  const queries: Array<Promise<WorkflowEntity[]>> = [];
+  const catOrder: PendingCategory[] = [];
+
+  if (cats.includes("expense_approval")) {
+    catOrder.push("expense_approval");
+    queries.push(
+      queryExpenseClaims({
+        status: "Pending",
+        ...(notionUserId ? { submitterNotionUserId: notionUserId } : {}),
+      }).then((items) => items.map(expenseClaimToEntity)),
+    );
+  }
+
+  if (cats.includes("expense_payment")) {
+    catOrder.push("expense_payment");
+    queries.push(
+      queryExpenseClaims({
+        status: "Approved",
+        ...(notionUserId ? { submitterNotionUserId: notionUserId } : {}),
+      }).then((items) => items.map(expenseClaimToEntity)),
+    );
+  }
+
+  if (cats.includes("recruitment")) {
+    catOrder.push("recruitment");
+    queries.push(
+      queryRecruitment({ status: "Pending Review" }).then((items) =>
+        items.map(recruitmentToEntity),
+      ),
+    );
+  }
+
+  if (cats.includes("feedback")) {
+    catOrder.push("feedback");
+    queries.push(
+      queryFeedback({
+        status: "Pending",
+        ...(notionUserId ? { assigneeNotionUserId: notionUserId } : {}),
+      }).then((items) => items.map(feedbackToEntity)),
+    );
+  }
+
+  if (cats.includes("task")) {
+    catOrder.push("task");
+    queries.push(
+      queryTasks({
+        ...(notionUserId ? { assigneeNotionUserId: notionUserId } : {}),
+        status: "To Do",
+      })
+        .then((todoItems) =>
+          queryTasks({
+            ...(notionUserId ? { assigneeNotionUserId: notionUserId } : {}),
+            status: "In Progress",
+          }).then((inProgressItems) => [...todoItems, ...inProgressItems]),
+        )
+        .then((items) => items.map(taskToEntity)),
+    );
+  }
+
+  const results = await Promise.all(queries);
+
+  const countByCategory = {} as Record<PendingCategory, number>;
+  for (const cat of ALL_PENDING_CATEGORIES) {
+    countByCategory[cat] = 0;
+  }
+
+  const allItems: WorkflowEntity[] = [];
+  for (let i = 0; i < results.length; i++) {
+    const cat = catOrder[i];
+    const items = results[i];
+    countByCategory[cat] = items.length;
+    allItems.push(...items);
+  }
+
+  // Sort: overdue first (by dueDate ascending), then by createdAt descending
+  allItems.sort((a, b) => {
+    const now = new Date().toISOString();
+    const aOverdue = a.dueDate && a.dueDate < now;
+    const bOverdue = b.dueDate && b.dueDate < now;
+    if (aOverdue && !bOverdue) return -1;
+    if (!aOverdue && bOverdue) return 1;
+    if (aOverdue && bOverdue) {
+      return (a.dueDate ?? "").localeCompare(b.dueDate ?? "");
+    }
+    return b.createdAt.localeCompare(a.createdAt);
+  });
+
+  return {
+    items: allItems,
+    countByCategory,
+    total: allItems.length,
+  };
+}
+
 export async function getDailyDigest(): Promise<DailyDigest> {
+  const { queryExpenseClaims, queryRecruitment, queryFeedback } = await import(
+    "~/lib/notion/query"
+  );
+
   const [
     pendingExpenses,
     approvedExpenses,
@@ -93,7 +236,6 @@ export async function getDailyDigest(): Promise<DailyDigest> {
       url: e.url,
       claimTitle: e.claimTitle,
       amount: e.amount,
-      currency: e.currency,
       submittedBy: e.submittedBy,
     })),
     approvedExpenses: approvedExpenses.map((e) => ({
@@ -101,7 +243,6 @@ export async function getDailyDigest(): Promise<DailyDigest> {
       url: e.url,
       claimTitle: e.claimTitle,
       amount: e.amount,
-      currency: e.currency,
       submittedBy: e.submittedBy,
     })),
     pendingRecruitment: pendingRecruitment.map((r) => ({
