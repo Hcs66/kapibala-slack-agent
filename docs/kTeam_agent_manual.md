@@ -6,7 +6,8 @@
 
 ## 前置说明：Slack 与 Notion
 
-在使用 kTeam Agent 之前，请确保已加入 Slack Workspace 和 Notion 团队。
+- 在使用 kTeam Agent 之前，请确保已加入 Slack Workspace 和 Notion 团队。
+- kTeam Agent 基于 Slack App构建，加入Slack后请配置App使用（参考：https://slack.com/help/articles/360001537467-Guide-to-apps-in-Slack），配置正确后可在slack侧边栏(desktop)或主页列表(mobile)中访问
 
 ### 重要链接
 
@@ -14,6 +15,7 @@
 - 邀请链接（加入 Workspace）: https://join.slack.com/t/kapibalaai/shared_invite/zt-3sdaz7x78-bW8SYH7EnINRuDUDZ4SCzw
 - Slack 帮助 - 加入工作区: https://app.slack.com/slackhelp/zh-CN/212675257
 - Slack 新用户指南: https://app.slack.com/slackhelp/zh-CN/218080037
+- kTeam Agent
 
 **Slack 频道**
 - feedback (反馈): https://app.slack.com/client/T0AKZDWB1RB/C0ALX532TUY
