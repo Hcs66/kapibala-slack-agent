@@ -478,14 +478,16 @@ const createTasksFromMeeting = tool({
 
 #### 4.1 实现内容
 
-1. Notion 新建 Decisions 数据库，字段：
+1. Notion 新建 Decisions 数据库，字段（**已手动创建**）：
    - Decision Title (title)
    - Decision Content (rich_text)
    - Decision Maker (people)
    - Reason (rich_text)
-   - Impact Scope (multi_select)
+   - Impact Scope (multi_select: Team / Organization /External)
    - Follow-up Actions (relation → Tasks)
+   - Priority (select: Low / Medium / High / Critical)
    - Status (status: Proposed / Confirmed / Superseded)
+   - Category (select: Strategic / Operational / Technical / Financial / HR)
    - Date (date)
 
 2. 创建 `server/lib/skills/decision/` Skill：
@@ -524,7 +526,7 @@ const askKnowledge = tool({
   description: "从团队知识库中检索信息回答问题",
   inputSchema: z.object({
     question: z.string(),
-    sources: z.array(z.enum(["docs", "decisions", "meeting_notes"])).optional(),
+    sources: z.array(z.enum(["docs", "decisions"])).optional(),
   }),
   execute: async ({ question, sources }) => {
     // 1. 从 Notion Docs 数据库检索相关文档
@@ -536,7 +538,7 @@ const askKnowledge = tool({
 ```
 
 2. 实现策略：
-   - 短期：使用 Notion Search API 做关键词检索 + LLM 总结
+   - 短期：使用 Notion Search API 做关键词检索 + LLM 总结（本次实现）
    - 中期：引入 embedding + 向量检索（需要额外基础设施）
 
 **验收标准：**

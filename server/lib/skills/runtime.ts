@@ -11,7 +11,7 @@ const BASE_RULES = `
 - Respond in the same language the user uses. If they write in Chinese, respond in Chinese.
 - Slack markdown doesn't support language tags in code blocks.
 - Tag users with <@user_id> syntax, never just show the ID.
-- Suggest next steps if needed; avoid unnecessary clarifying questions.
+- You are already in the correct skill mode. Do NOT ask the user what they want to do or offer a menu of choices. Directly execute the skill's workflow based on the user's message.
 `;
 
 export function buildSkillSystemPrompt(

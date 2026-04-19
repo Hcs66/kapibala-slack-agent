@@ -49,7 +49,7 @@ export const queryPendingApprovals = tool({
 
 export const submitExpenseClaim = tool({
   description:
-    "Submit an expense claim (reimbursement request) to Notion and send it for approval. Use this when the user wants to submit an expense or reimbursement. You MUST extract structured fields from the user's natural language and present them for confirmation BEFORE calling this tool. Only call this tool after the user confirms. After submission, the claim is sent to the approvals channel — the user will be notified via DM when it's approved or rejected. All amounts are in USD.",
+    "Submit an expense claim to Notion and send it for approval. You MUST call this tool immediately when the user confirms the expense details. Do NOT respond with text only — invoke this tool. After submission, the claim goes to the approvals channel, the user gets an invoice upload button, and will be notified of approval/rejection via DM. All amounts are in USD.",
   inputSchema: z.object({
     claimTitle: z
       .string()

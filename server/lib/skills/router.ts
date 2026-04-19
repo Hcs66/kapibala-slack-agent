@@ -1,3 +1,4 @@
+import { generateText } from "ai";
 import type { Skill } from "./types";
 
 export interface RouteResult {
@@ -55,25 +56,61 @@ export function parseClassificationResponse(
   return skills.find((s) => s.name === cleaned) ?? null;
 }
 
-export function routeToSkill(
+export async function routeByLLM(
   userMessage: string,
   skills: Skill[],
-): RouteResult {
+): Promise<RouteResult | null> {
+  try {
+    const prompt = buildClassificationPrompt(userMessage, skills);
+
+    const result = await generateText({
+      model: "minimax/minimax-m2.7-highspeed",
+      prompt,
+      maxOutputTokens: 20,
+      temperature: 0,
+    });
+
+    const skillName = result.text.trim().toLowerCase().replace(/['"]/g, "");
+    const skill = skills.find((s) => s.name === skillName);
+
+    if (skill) {
+      return { skill, confidence: 0.8 };
+    }
+
+    return null;
+  } catch (error) {
+    console.error("LLM routing failed:", error);
+    return null;
+  }
+}
+
+export async function routeToSkill(
+  userMessage: string,
+  skills: Skill[],
+): Promise<RouteResult> {
   if (skills.length === 0) {
     throw new Error("No skills registered");
   }
 
+  // Fast path: any keyword match → use it directly (no LLM call needed)
   const keywordResult = routeByKeyword(userMessage, skills);
-  if (keywordResult && keywordResult.confidence >= 0.1) {
+  if (keywordResult) {
     return keywordResult;
   }
 
+  // No keyword matched → ask LLM to classify
+  const llmResult = await routeByLLM(userMessage, skills);
+  if (llmResult) {
+    return llmResult;
+  }
+
+  // LLM failed → try description matching
   const descriptionResult = routeByDescription(userMessage, skills);
   if (descriptionResult) {
     return descriptionResult;
   }
 
-  return { skill: skills[0], confidence: 0.1 };
+  return { skill: skills[0], confidence: 0 };
 }
 
 function routeByDescription(

@@ -9,7 +9,7 @@ import {
 
 const createTaskTool = tool({
   description:
-    "Create a new task in the Notion Tasks database. You MUST extract structured fields and present them for confirmation BEFORE calling this tool. Only call after the user confirms.",
+    "Create a new task in the Notion Tasks database. You MUST call this tool immediately when the user confirms the task details. Do NOT respond with text only — invoke this tool. After creation, the assignee receives a DM notification.",
   inputSchema: z.object({
     name: z.string().describe("Task name/title"),
     taskNum: z.string().describe("Task number identifier, e.g. B1, C3, A2"),

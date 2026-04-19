@@ -55,7 +55,7 @@ const updateBudget = tool({
 
 const addExpense = tool({
   description:
-    "Add a new expense entry to the Notion expenses database. The agent should infer the budget category from the expense description and automatically resolve the current month.",
+    "Add a new expense entry to the Notion expenses database. You MUST call this tool immediately when the user confirms the expense details. Do NOT respond with text only — invoke this tool. The agent should infer the budget category from the expense description. The current month is resolved automatically.",
   inputSchema: z.object({
     expenseName: z.string().describe("Name/description of the expense"),
     amount: z.number().describe("Expense amount in USD"),

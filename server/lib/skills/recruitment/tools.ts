@@ -5,7 +5,7 @@ import { formatRecruitmentList } from "~/lib/skills/shared/formatters";
 
 export const submitCandidate = tool({
   description:
-    "Submit a candidate entry to the recruitment database in Notion. Use this when the user mentions a candidate, referral, or someone applying for a position. You MUST extract structured fields from the user's natural language and present them for confirmation BEFORE calling this tool. Only call this tool after the user confirms the extracted information.",
+    "Submit a candidate entry to the recruitment database in Notion. You MUST call this tool immediately when the user confirms the candidate details. Do NOT respond with text only — invoke this tool. After submission, the candidate is sent to #recruitments channel, the user gets a resume upload button, and the interviewer is notified via DM.",
   inputSchema: z.object({
     candidateName: z.string().describe("Full name of the candidate"),
     positionApplied: z

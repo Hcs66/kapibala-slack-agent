@@ -6,7 +6,7 @@ import { resolveNotionUserId } from "~/lib/slack/user-resolver";
 
 export const submitFeedback = tool({
   description:
-    "Submit a feedback entry (bug report, feature request, or general feedback) to Notion. Use this when the user describes a bug, requests a feature, or provides feedback. You MUST extract structured fields from the user's natural language and present them for confirmation BEFORE calling this tool. Only call this tool after the user confirms the extracted information.",
+    "Submit a feedback entry (bug report, feature request, or general feedback) to Notion. You MUST call this tool immediately when the user confirms the feedback details. Do NOT respond with text only — invoke this tool. After submission, the feedback is sent to #feedback channel and the user gets a Notion link.",
   inputSchema: z.object({
     name: z.string().describe("Short title summarizing the feedback"),
     type: z

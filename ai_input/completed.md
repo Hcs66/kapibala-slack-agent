@@ -740,3 +740,113 @@ Agent 收到总结请求后：
 ---
 请仔细阅读kapibala公司分析和kTeam后续迭代建议(ai_input/resources/roadmap_v4.md)，帮我生成一份详细的v4迭代计划
 ---
+根据 roadmap_v4(docs/v4/kTeam_roadmap_v4.md), 实现：`Phase 1: Skill 架构引入（P0 — 核心架构升级）`:
+
+- `Phase 0: 统一工作流内核（P0 — 基础设施）`已实现
+
+---
+
+根据 roadmap_v4(docs/v4/kTeam_roadmap_v4.md), 实现：`Phase 2: Pending Center — 统一待处理中心`:
+
+- `Phase 0: 统一工作流内核（P0 — 基础设施）`已实现
+- `Phase 1: Skill 架构引入（P0 — 核心架构升级）`已实现
+
+---
+根据 roadmap_v4(docs/v4/kTeam_roadmap_v4.md), 实现：`Phase 4: 决策记录系统`:
+
+- `Phase 0: 统一工作流内核（P0 — 基础设施）`已实现
+- `Phase 1: Skill 架构引入（P0 — 核心架构升级）`已实现
+- `Phase 2: Pending Center — 统一待处理中心（P1）`已实现
+- `Phase 3: 会议纪要 → 任务自动化（P2））`暂不实现
+
+---
+报销流程(expense_claim)从agent中拆分为skill后，流程与之前相比不完整：
+
+## 说明
+- 先确认问题再修改
+
+## 问题
+- 应该是没有调用 `submitExpenseClaim` tool
+
+## 缺少步骤
+- 用户确认后应该将报销信息提交到notion
+- 同步到notion后追问用户是否需要上传发票，显示一个上传按钮
+- 用户提交报销后需要同步给报销审核者审核（通过EXPENSE_CLAIM_APPROVER_EMAIL关联），审核结果需要同步给用户并更新notion状态
+- 报销审核通过后需要同步给付款者（通过EXPENSE_CLAIM_PAYER_EMAIL关联），审核结果同步用户和notion
+
+---
+可以了，顺便检查下skill有没有类似的问题，可以先参考之前的用户手册：docs/kTeam_agent_manual.md
+---
+招聘技能（recruitment）有问题：
+
+## 之前的效果
+
+```
+## 4. 候选人录入
+
+### 技能名称
+
+对话式录入候选人
+
+### 技能说明
+
+在 Slack 中提到候选人信息，Agent 自动提取姓名、职位、来源、联系方式、面试时间等字段，确认后写入 Notion 招聘数据库。提交后自动通知 #recruitments 频道和 Interviewer。
+
+### 应用场景
+
+- HR 在群里说：「有个候选人叫张三，应聘 Software Engineer，LinkedIn 上看到的」
+- 面试官推荐：「推荐一个候选人李四，Product Manager，邮箱 lisi@example.com」
+- 安排面试：「张三面试时间定在 4月5日」
+
+### 使用举例
+
+**用户：**
+> 有个候选人叫张三，应聘 Software Engineer，简历是 LinkedIn 上看到的，邮箱 zhangsan@example.com
+
+**Agent 回复：**
+> 收到，我整理了一下：
+> - *候选人:* 张三
+> - *应聘职位:* Software Engineer
+> - *简历来源:* LinkedIn
+> - *邮箱:* zhangsan@example.com
+>
+> 确认后我帮你录入到 Notion。
+
+![候选人录入截图](screenshots/recuitment/recruitment.png)
+
+**用户：** 确认
+
+**Agent 回复：**
+> 候选人已录入：[View in Notion](链接)
+> 点击下方按钮上传简历附件。
+> 已通知 #recruitments 频道。
+
+### 返回结果说明
+
+- 录入成功：返回 Notion 链接 + 简历上传按钮（可上传 PDF 或链接）
+- 自动通知 #recruitments 频道（含候选人详情）
+- 自动 DM 通知 Interviewer 有新候选人
+
+### 支持的职位
+
+AI Post-Training Engineer、AI Product Engineer / Full-Stack、International Business Development、Software Engineer、Product Manager、UX Designer、HR Specialist
+
+### 支持的简历来源
+
+LinkedIn、Xiaohongshu、Email、Liepin、Other
+```
+
+## 实际效果
+agent返回：
+```
+收到，候选人信息：
+姓名： 张三
+应聘职位： Software Engineer
+来源： LinkedIn
+请问你需要我帮你做什么？比如：
+:memo: 记录到某个地方
+:loudspeaker: 分享到某个频道
+:question: 其他需求
+
+```
+---

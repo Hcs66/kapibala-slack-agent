@@ -1,4 +1,5 @@
 import type {
+  DecisionRecord,
   ExpenseClaimRecord,
   FeedbackRecord,
   RecruitmentRecord,
@@ -93,6 +94,53 @@ export function formatBudgetStatusList(items: BudgetStatusItem[]): string {
     .join("\n");
 }
 
+const ENTITY_TYPE_LABEL: Record<string, string> = {
+  expense_claim: "Expense",
+  recruitment: "Recruitment",
+  task: "Task",
+  feedback: "Feedback",
+  decision: "Decision",
+};
+
+const STATUS_EMOJI: Record<string, string> = {
+  pending: "🟡",
+  in_progress: "🔵",
+  approved: "✅",
+  rejected: "❌",
+  done: "✅",
+  cancelled: "⚪",
+};
+
+export function formatPendingEntityList(
+  items: Array<{
+    type: string;
+    title: string;
+    status: string;
+    priority?: string;
+    dueDate?: string;
+    notionPageUrl: string;
+    metadata: Record<string, unknown>;
+  }>,
+): string {
+  if (items.length === 0) return "No pending items found.";
+  return items
+    .map((item, i) => {
+      const emoji = STATUS_EMOJI[item.status] ?? "⬜";
+      const label = ENTITY_TYPE_LABEL[item.type] ?? item.type;
+      const parts = [`${i + 1}. ${emoji} *[${label}]* ${item.title}`];
+      if (item.priority) parts.push(`Priority: ${item.priority}`);
+      if (item.dueDate) parts.push(`Due: ${item.dueDate}`);
+      if (item.type === "expense_claim" && item.metadata.amount != null) {
+        parts.push(
+          `${item.metadata.amount} ${(item.metadata.currency as string) ?? "USD"}`,
+        );
+      }
+      parts.push(`<${item.notionPageUrl}|View>`);
+      return parts.join(" | ");
+    })
+    .join("\n");
+}
+
 export function formatExpenseList(
   items: Array<{
     expense: string;
@@ -108,6 +156,29 @@ export function formatExpenseList(
       if (e.amount != null) parts.push(`$${e.amount}`);
       if (e.date) parts.push(`Date: ${e.date}`);
       parts.push(`<${e.url}|View in Notion>`);
+      return parts.join(" | ");
+    })
+    .join("\n");
+}
+
+export function formatDecisionList(items: DecisionRecord[]): string {
+  if (items.length === 0) return "No decisions found.";
+  return items
+    .map((d, i) => {
+      const parts = [`${i + 1}. *${d.title}*`];
+      if (d.status) parts.push(`Status: ${d.status}`);
+      if (d.category) parts.push(`Category: ${d.category}`);
+      if (d.priority) parts.push(`Priority: ${d.priority}`);
+      if (d.date) parts.push(`Date: ${d.date}`);
+      if (d.impactScope.length > 0)
+        parts.push(`Scope: ${d.impactScope.join(", ")}`);
+      if (d.decisionMaker.length > 0) {
+        const names = d.decisionMaker
+          .map((m) => m.name ?? "Unknown")
+          .join(", ");
+        parts.push(`By: ${names}`);
+      }
+      parts.push(`<${d.url}|View in Notion>`);
       return parts.join(" | ");
     })
     .join("\n");

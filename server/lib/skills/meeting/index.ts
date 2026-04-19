@@ -16,8 +16,6 @@ export const meetingSkill: Skill = {
     "纪要",
     "notes",
     "会议",
-    "决策",
-    "decisions",
     "action items",
     "保存.*文档",
     "save.*doc",

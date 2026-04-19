@@ -70,10 +70,11 @@ export function createSkillAgent(
   });
 }
 
-export function routeAndCreateAgent(
+export async function routeAndCreateAgent(
   userMessage: string,
   context: SlackAgentContextInput,
-): { agent: DurableAgent; skillName: string } {
+  allUserMessages?: string[],
+): Promise<{ agent: DurableAgent; skillName: string }> {
   const skills = getAllSkills();
 
   if (skills.length === 0) {
@@ -81,7 +82,30 @@ export function routeAndCreateAgent(
   }
 
   try {
-    const { skill } = routeToSkill(userMessage, skills);
+    const { skill, confidence } = await routeToSkill(userMessage, skills);
+    const isDefaultFallback = confidence === 0;
+
+    if (!isDefaultFallback) {
+      return {
+        agent: createSkillAgent(skill.name, context),
+        skillName: skill.name,
+      };
+    }
+
+    // Latest message didn't match any skill (e.g. "确认", "好的", "ok") —
+    // check earlier messages in the thread for skill context
+    if (allUserMessages && allUserMessages.length > 1) {
+      for (let i = allUserMessages.length - 2; i >= 0; i--) {
+        const historyResult = await routeToSkill(allUserMessages[i], skills);
+        if (historyResult.confidence > 0) {
+          return {
+            agent: createSkillAgent(historyResult.skill.name, context),
+            skillName: historyResult.skill.name,
+          };
+        }
+      }
+    }
+
     return {
       agent: createSkillAgent(skill.name, context),
       skillName: skill.name,

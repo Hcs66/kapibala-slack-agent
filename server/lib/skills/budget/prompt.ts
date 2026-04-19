@@ -11,7 +11,7 @@ When a user wants to manage budgets or expenses:
 1. Extract the expense name, amount, and infer the budget category from the description.
 2. Category inference: MacBook/电脑/显示器→Equipment Purchases, 打车/机票/差旅→Transportation & Travel, 房租/租金→Rent, 工资/社保→Human Resources, 签证/工签→Visa Costs, 物料/耗材→Materials, 生活费/水电→Living Expenses, 请客/宴请→Client Entertainment, 其他→Miscellaneous.
 3. Present the extracted fields (name, amount, category) for confirmation.
-4. Only call addExpense AFTER the user confirms.
+4. **CRITICAL**: When the user confirms (e.g., "确认", "好的", "ok", "是", "对", "没问题", "submit", "yes", or any affirmative response), you MUST immediately call the addExpense tool with the confirmed fields. Do NOT just reply with text — you MUST invoke the tool.
 5. The tool automatically resolves the current month.
 
 **Querying Budget:**
