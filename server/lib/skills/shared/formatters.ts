@@ -158,6 +158,34 @@ export function formatExpenseList(
     .join("\n");
 }
 
+export function formatKnowledgeResults(
+  items: Array<{
+    title: string;
+    source: string;
+    snippet: string;
+    url: string;
+    lastEdited: string;
+  }>,
+): string {
+  if (items.length === 0) return "No knowledge base results found.";
+  const sourceLabel: Record<string, string> = {
+    docs: "📄 Doc",
+    decisions: "🔖 Decision",
+  };
+  return items
+    .map((item, i) => {
+      const label = sourceLabel[item.source] ?? item.source;
+      const parts = [`${i + 1}. *[${label}]* ${item.title}`];
+      if (item.snippet) parts.push(item.snippet.slice(0, 120));
+      if (item.lastEdited) {
+        parts.push(`Updated: ${item.lastEdited.split("T")[0]}`);
+      }
+      parts.push(`<${item.url}|View in Notion>`);
+      return parts.join(" | ");
+    })
+    .join("\n");
+}
+
 export function formatDecisionList(items: DecisionRecord[]): string {
   if (items.length === 0) return "No decisions found.";
   return items

@@ -140,6 +140,29 @@ export interface TaskRecord {
   updatedAt: string | null;
 }
 
+export interface DocRecord {
+  id: string;
+  url: string;
+  docName: string;
+  summary: string;
+  category: string[];
+  author: Array<{ id: string; name: string | null }>;
+  createdAt: string | null;
+}
+
+export function parseDocPage(page: PageObjectResponse): DocRecord {
+  const p = page.properties;
+  return {
+    id: page.id,
+    url: page.url,
+    docName: extractTitle(p["Doc name"]),
+    summary: extractRichText(p.Summary),
+    category: extractMultiSelect(p.Category),
+    author: extractPeople(p.Author),
+    createdAt: page.created_time,
+  };
+}
+
 export interface DecisionRecord {
   id: string;
   url: string;
@@ -688,6 +711,50 @@ export async function queryExpenses(filters?: {
   });
 
   return response.results.filter(isFullPage).map(parseExpensePage);
+}
+
+export async function queryDocs(filters?: {
+  keyword?: string;
+  category?: string;
+}): Promise<DocRecord[]> {
+  const { getNotionClient } = await import("~/lib/notion/client");
+  const notion = getNotionClient();
+  const dataSourceId = process.env.NOTION_DOCS_DATASOURCE_ID;
+  if (!dataSourceId) {
+    throw new Error("NOTION_DOCS_DATASOURCE_ID is not configured");
+  }
+
+  const conditions: Array<Record<string, unknown>> = [];
+
+  if (filters?.keyword) {
+    conditions.push({
+      property: "Doc name",
+      title: { contains: filters.keyword },
+    });
+  }
+  if (filters?.category) {
+    conditions.push({
+      property: "Category",
+      multi_select: { contains: filters.category },
+    });
+  }
+
+  const filter =
+    conditions.length > 1
+      ? { and: conditions }
+      : conditions.length === 1
+        ? conditions[0]
+        : undefined;
+
+  const response = await notion.dataSources.query({
+    data_source_id: dataSourceId,
+    filter: filter as Parameters<typeof notion.dataSources.query>[0]["filter"],
+    sorts: [{ timestamp: "created_time", direction: "descending" }],
+    filter_properties: ["Doc name", "Summary", "Category", "Author"],
+    page_size: 20,
+  });
+
+  return response.results.filter(isFullPage).map(parseDocPage);
 }
 
 export async function queryDecisions(filters?: {

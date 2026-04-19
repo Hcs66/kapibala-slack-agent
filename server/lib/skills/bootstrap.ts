@@ -14,6 +14,7 @@ export async function initializeSkills(): Promise<void> {
   const { alertSkill } = await import("~/lib/skills/alert");
   const { pendingCenterSkill } = await import("~/lib/skills/pending-center");
   const { decisionSkill } = await import("~/lib/skills/decision");
+  const { knowledgeSkill } = await import("~/lib/skills/knowledge");
 
   registerSkill(feedbackSkill);
   registerSkill(expenseSkill);
@@ -24,6 +25,7 @@ export async function initializeSkills(): Promise<void> {
   registerSkill(alertSkill);
   registerSkill(pendingCenterSkill);
   registerSkill(decisionSkill);
+  registerSkill(knowledgeSkill);
 
   initialized = true;
 }
