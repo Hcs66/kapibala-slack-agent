@@ -2,7 +2,10 @@ import { tool } from "ai";
 import { z } from "zod";
 import type { SlackAgentContextInput } from "~/lib/ai/context";
 import { formatExpenseClaimList } from "~/lib/skills/shared/formatters";
-import { resolveNotionUserId } from "~/lib/slack/user-resolver";
+import {
+  resolveNotionUserId,
+  resolveSlackUserByMention,
+} from "~/lib/slack/user-resolver";
 
 export const queryPendingApprovals = tool({
   description:
@@ -69,9 +72,28 @@ export const submitExpenseClaim = tool({
         "Other",
       ])
       .describe("Category of the expense"),
+    approverMention: z
+      .string()
+      .optional()
+      .describe(
+        "Optional override for the approver. Can be a Slack mention like <@U12345>, an email, or a display name. If not provided, the default approver from env config is used.",
+      ),
+    payerMention: z
+      .string()
+      .optional()
+      .describe(
+        "Optional override for the payer. Can be a Slack mention like <@U12345>, an email, or a display name. If not provided, the default payer from env config is used.",
+      ),
   }),
   execute: async (
-    { claimTitle, claimDescription, amount, expenseType },
+    {
+      claimTitle,
+      claimDescription,
+      amount,
+      expenseType,
+      approverMention,
+      payerMention,
+    },
     { experimental_context },
   ) => {
     "use step";
@@ -89,14 +111,33 @@ export const submitExpenseClaim = tool({
         ctx.user_id,
       );
 
+      let approverNotionUserId: string | null = null;
+      let payerNotionUserId: string | null = null;
+
+      if (approverMention) {
+        const resolved = await resolveSlackUserByMention(
+          ctx.token,
+          approverMention,
+        );
+        approverNotionUserId = resolved.notionUserId;
+      }
+
+      if (payerMention) {
+        const resolved = await resolveSlackUserByMention(
+          ctx.token,
+          payerMention,
+        );
+        payerNotionUserId = resolved.notionUserId;
+      }
+
       const page = await createExpenseClaim({
         claimTitle,
         claimDescription,
         amount,
         expenseType,
         paymentMethod: "",
-        approverNotionUserId: null,
-        payerNotionUserId: null,
+        approverNotionUserId,
+        payerNotionUserId,
         submittedByNotionUserId,
         notes: "",
         invoiceAttachments: [],

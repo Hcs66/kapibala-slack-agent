@@ -89,3 +89,23 @@ export async function resolveSlackUserByMention(
     return { notionUserId: null, slackUserId: null };
   }
 }
+
+export async function resolveSlackUserByNotionId(
+  token: string,
+  notionUserId: string,
+): Promise<string | null> {
+  try {
+    const { getAllNotionPersonUsers } = await import("~/lib/notion/user-map");
+    const notionUsers = await getAllNotionPersonUsers();
+    const match = notionUsers.find((u) => u.notionUserId === notionUserId);
+    if (!match) return null;
+
+    const { WebClient } = await import("@slack/web-api");
+    const client = new WebClient(token);
+    const lookup = await client.users.lookupByEmail({ email: match.email });
+    return lookup.user?.id ?? null;
+  } catch (error) {
+    console.warn("Failed to resolve Slack user by Notion ID:", error);
+    return null;
+  }
+}
