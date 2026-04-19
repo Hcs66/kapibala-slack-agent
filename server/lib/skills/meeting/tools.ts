@@ -1,8 +1,15 @@
 import { tool } from "ai";
 import { z } from "zod";
 import type { SlackAgentContextInput } from "~/lib/ai/context";
-import { saveDocApprovalHook } from "~/lib/ai/workflows/hooks";
-import { resolveNotionUserId } from "~/lib/slack/user-resolver";
+import {
+  meetingActionItemsApprovalHook,
+  saveDocApprovalHook,
+} from "~/lib/ai/workflows/hooks";
+import type { MeetingActionItem } from "~/lib/slack/blocks";
+import {
+  resolveNotionUserId,
+  resolveSlackUserByMention,
+} from "~/lib/slack/user-resolver";
 
 async function sendSaveDocApprovalRequest(
   ctx: SlackAgentContextInput,
@@ -235,4 +242,194 @@ const saveDocToNotion = tool({
   },
 });
 
-export const meetingTools = { getThreadMessagesForSummary, saveDocToNotion };
+async function sendActionItemsApprovalRequest(
+  ctx: SlackAgentContextInput,
+  toolCallId: string,
+  meetingTitle: string,
+  actionItems: MeetingActionItem[],
+): Promise<{ success: boolean }> {
+  "use step";
+  const { WebClient } = await import("@slack/web-api");
+  const { meetingActionItemsApprovalBlocks } = await import(
+    "~/lib/slack/blocks"
+  );
+
+  const client = new WebClient(ctx.token);
+  await client.chat.postMessage({
+    channel: ctx.dm_channel,
+    thread_ts: ctx.thread_ts,
+    blocks: meetingActionItemsApprovalBlocks({
+      toolCallId,
+      meetingTitle,
+      actionItems,
+    }),
+    text: `Create ${actionItems.length} task(s) from "${meetingTitle}"?`,
+  });
+
+  return { success: true };
+}
+
+async function performCreateTasks(
+  ctx: SlackAgentContextInput,
+  meetingTitle: string,
+  actionItems: MeetingActionItem[],
+): Promise<{
+  success: boolean;
+  message: string;
+  createdTasks: Array<{ name: string; pageUrl: string }>;
+  error?: string;
+}> {
+  "use step";
+
+  const { createTask } = await import("~/lib/notion/tasks");
+  const { WebClient } = await import("@slack/web-api");
+
+  const createdTasks: Array<{ name: string; pageUrl: string }> = [];
+
+  for (const item of actionItems) {
+    let assigneeNotionUserId: string | null = null;
+    let assigneeSlackUserId: string | null = null;
+
+    if (item.assignee) {
+      const resolved = await resolveSlackUserByMention(
+        ctx.token,
+        item.assignee,
+      );
+      assigneeNotionUserId = resolved.notionUserId;
+      assigneeSlackUserId = resolved.slackUserId;
+    }
+
+    const taskPage = await createTask({
+      name: item.taskName,
+      taskNum: "",
+      description: item.description,
+      summary: `Action item from meeting: ${meetingTitle}`,
+      priority: item.priority,
+      assigneeNotionUserId,
+      dueDate: item.dueDate ?? null,
+    });
+
+    const pageUrl = (taskPage as { url: string }).url;
+    createdTasks.push({ name: item.taskName, pageUrl });
+
+    if (assigneeSlackUserId) {
+      const client = new WebClient(ctx.token);
+      try {
+        await client.chat.postMessage({
+          channel: assigneeSlackUserId,
+          text: `New task from meeting: ${item.taskName}`,
+          blocks: [
+            {
+              type: "header",
+              text: {
+                type: "plain_text",
+                text: "📋 New Task from Meeting",
+              },
+            },
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: [
+                  `*Task:* ${item.taskName}`,
+                  `*From Meeting:* ${meetingTitle}`,
+                  `*Priority:* ${item.priority}`,
+                  `*Assigned by:* <@${ctx.user_id}>`,
+                  item.dueDate ? `*Due:* ${item.dueDate}` : "",
+                  `*Notion:* <${pageUrl}|View in Notion>`,
+                ]
+                  .filter(Boolean)
+                  .join("\n"),
+              },
+            },
+          ],
+        });
+      } catch (dmError) {
+        console.warn("Failed to send meeting task DM:", dmError);
+      }
+    }
+  }
+
+  return {
+    success: true,
+    message: `Created ${createdTasks.length} task(s) from meeting "${meetingTitle}".`,
+    createdTasks,
+  };
+}
+
+const createTasksFromMeeting = tool({
+  description:
+    "Create tasks in Notion from meeting action items. Shows a confirmation button to the user before creating. Call this AFTER generating the summary when action items have been identified.",
+  inputSchema: z.object({
+    meetingTitle: z
+      .string()
+      .describe("Title of the meeting or discussion thread"),
+    actionItems: z
+      .array(
+        z.object({
+          taskName: z.string().describe("Short task title"),
+          description: z
+            .string()
+            .describe("Task description with context from the discussion"),
+          assignee: z
+            .string()
+            .optional()
+            .describe(
+              "Person to assign. Pass raw Slack mention '<@U...>', name string, or email.",
+            ),
+          priority: z
+            .enum(["High", "Medium", "Low"])
+            .default("Medium")
+            .describe("Task priority — infer from discussion urgency"),
+          dueDate: z
+            .string()
+            .optional()
+            .describe("Due date in ISO 8601 format if mentioned"),
+        }),
+      )
+      .describe("Action items extracted from the meeting discussion"),
+  }),
+  execute: async (
+    { meetingTitle, actionItems },
+    { toolCallId, experimental_context },
+  ) => {
+    const ctx = experimental_context as SlackAgentContextInput;
+
+    try {
+      await sendActionItemsApprovalRequest(
+        ctx,
+        toolCallId,
+        meetingTitle,
+        actionItems,
+      );
+
+      const hook = meetingActionItemsApprovalHook.create({
+        token: toolCallId,
+      });
+      const { approved } = await hook;
+
+      if (!approved) {
+        return {
+          success: false,
+          message: "User skipped task creation from meeting.",
+          skipped: true,
+        };
+      }
+
+      return await performCreateTasks(ctx, meetingTitle, actionItems);
+    } catch (error) {
+      console.error("Failed to create tasks from meeting:", error);
+      return {
+        success: false,
+        message: "Failed to create tasks from meeting",
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  },
+});
+
+export const meetingTools = {
+  getThreadMessagesForSummary,
+  saveDocToNotion,
+  createTasksFromMeeting,
+};

@@ -1,6 +1,3 @@
-根据 roadmap_v4(docs/v4/kTeam_roadmap_v4.md), 实现：`Phase 3: 会议纪要 → 任务自动化（P2））`:
+继续优化：
 
-- `Phase 0: 统一工作流内核（P0 — 基础设施）`已实现
-- `Phase 1: Skill 架构引入（P0 — 核心架构升级）`已实现
-- `Phase 2: Pending Center — 统一待处理中心（P1）`已实现
-- `Phase 4: 决策记录系统`已实现
+- 目前在报销流程中，APPROVER和PAYER是通过env硬编码传入的email地址来匹配，短期内这个相对固定问题不大，有没有更好的方案能够支持灵活场景，比如默认是env的配置，也支持临时调整，比如在报销时说：让@hcs 来处理付款，然后搜索对应用户

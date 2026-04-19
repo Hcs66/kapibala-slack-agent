@@ -5,7 +5,7 @@ import { meetingTools } from "./tools";
 export const meetingSkill: Skill = {
   name: "meeting",
   description:
-    "Summarize discussions, create meeting notes, and save documents to Notion",
+    "Summarize discussions, create meeting notes, extract action items as tasks, and save documents to Notion",
   triggerPatterns: [
     "总结",
     "summarize",
@@ -17,8 +17,12 @@ export const meetingSkill: Skill = {
     "notes",
     "会议",
     "action items",
+    "待办.*提取",
+    "extract.*tasks",
     "保存.*文档",
     "save.*doc",
+    "创建.*任务.*会议",
+    "create.*tasks.*meeting",
   ],
   systemPrompt: meetingPrompt,
   tools: meetingTools,
@@ -27,6 +31,11 @@ export const meetingSkill: Skill = {
       type: "notion_database",
       name: "Docs",
       envKey: "NOTION_DOCS_DATASOURCE_ID",
+    },
+    {
+      type: "notion_database",
+      name: "Tasks",
+      envKey: "NOTION_TASKS_DATASOURCE_ID",
     },
   ],
 };

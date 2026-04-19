@@ -4,6 +4,7 @@ import {
   CHANNEL_JOIN_APPROVAL_ACTION,
   EXPENSE_CLAIM_AGENT_APPROVAL_ACTION,
   EXPENSE_INVOICE_UPLOAD_ACTION,
+  MEETING_ACTION_ITEMS_ACTION,
   SAVE_DOC_ACTION,
 } from "~/lib/slack/blocks";
 import { EXPENSE_CLAIM_APPROVAL_ACTION } from "../views/expense-claim-form";
@@ -14,6 +15,7 @@ import { expenseClaimApprovalCallback } from "./expense-claim-approval";
 import { expenseClaimPayCallback } from "./expense-claim-pay";
 import { expenseInvoiceUploadCallback } from "./expense-invoice-upload";
 import { feedbackButtonsCallback } from "./feedback-button-action";
+import { meetingActionItemsApprovalCallback } from "./meeting-action-items-approval";
 import sampleActionCallback from "./sample-action";
 import { saveDocApprovalCallback } from "./save-doc-approval";
 
@@ -43,6 +45,11 @@ const register = (app: App) => {
   app.action(EXPENSE_INVOICE_UPLOAD_ACTION, expenseInvoiceUploadCallback);
   app.action(SAVE_DOC_ACTION, saveDocApprovalCallback);
   app.action(`${SAVE_DOC_ACTION}_reject`, saveDocApprovalCallback);
+  app.action(MEETING_ACTION_ITEMS_ACTION, meetingActionItemsApprovalCallback);
+  app.action(
+    `${MEETING_ACTION_ITEMS_ACTION}_reject`,
+    meetingActionItemsApprovalCallback,
+  );
 };
 
 export default { register };

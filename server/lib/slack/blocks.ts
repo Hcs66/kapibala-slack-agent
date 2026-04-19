@@ -240,6 +240,67 @@ export const candidateResumeUploadBlocks = ({
   return [sectionBlock, actionsBlock];
 };
 
+export const MEETING_ACTION_ITEMS_ACTION = "meeting_action_items_approval";
+
+export interface MeetingActionItem {
+  taskName: string;
+  description: string;
+  assignee?: string;
+  priority: string;
+  dueDate?: string;
+}
+
+export const meetingActionItemsApprovalBlocks = ({
+  toolCallId,
+  meetingTitle,
+  actionItems,
+}: {
+  toolCallId: string;
+  meetingTitle: string;
+  actionItems: MeetingActionItem[];
+}): KnownBlock[] => {
+  const itemLines = actionItems
+    .map((item, i) => {
+      const parts = [`${i + 1}. *${item.taskName}*`];
+      if (item.assignee) parts.push(`Assignee: ${item.assignee}`);
+      parts.push(`Priority: ${item.priority}`);
+      if (item.dueDate) parts.push(`Due: ${item.dueDate}`);
+      if (item.description) parts.push(`\n    ${item.description}`);
+      return parts.join(" | ");
+    })
+    .join("\n");
+
+  const sectionBlock: SectionBlock = {
+    type: "section",
+    text: {
+      type: "mrkdwn",
+      text: `📋 *Action Items from: ${meetingTitle}*\n\n${itemLines}\n\nCreate ${actionItems.length} task(s) in Notion?`,
+    },
+  };
+
+  const actionsBlock: ActionsBlock = {
+    type: "actions",
+    elements: [
+      {
+        type: "button",
+        text: { type: "plain_text", text: "Create Tasks", emoji: true },
+        style: "primary",
+        action_id: MEETING_ACTION_ITEMS_ACTION,
+        value: JSON.stringify({ toolCallId, approved: true }),
+      },
+      {
+        type: "button",
+        text: { type: "plain_text", text: "Skip", emoji: true },
+        style: "danger",
+        action_id: `${MEETING_ACTION_ITEMS_ACTION}_reject`,
+        value: JSON.stringify({ toolCallId, approved: false }),
+      },
+    ],
+  };
+
+  return [sectionBlock, actionsBlock];
+};
+
 export const SAVE_DOC_ACTION = "save_doc_to_notion";
 
 export const saveDocApprovalBlocks = ({
