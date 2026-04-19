@@ -4,6 +4,50 @@
 
 ---
 
+## 前置说明：Slack 与 Notion
+
+在使用 kTeam Agent 之前，请确保已加入 Slack Workspace 和 Notion 团队。
+
+### 重要链接
+
+**Slack**
+- 邀请链接（加入 Workspace）: https://join.slack.com/t/kapibalaai/shared_invite/zt-3sdaz7x78-bW8SYH7EnINRuDUDZ4SCzw
+- Slack 帮助 - 加入工作区: https://app.slack.com/slackhelp/zh-CN/212675257
+- Slack 新用户指南: https://app.slack.com/slackhelp/zh-CN/218080037
+
+**Slack 频道**
+- feedback (反馈): https://app.slack.com/client/T0AKZDWB1RB/C0ALX532TUY
+- expense-claim (报销): https://app.slack.com/client/T0AKZDWB1RB/C0AL0S2L0GN
+- recruitments (招聘): https://app.slack.com/client/T0AKZDWB1RB/C0ALFQX3U4R
+- dashboard (看板): https://app.slack.com/client/T0AKZDWB1RB/C0AN001J2US
+
+**Notion**
+- 邀请链接（加入团队）: https://www.notion.so/team/3217523c-7c93-811b-b45f-00429a0920e9/join
+- Notion 新手指南: https://www.notion.com/help/category/new-to-notion
+
+**Notion Databases**
+- Feedback (反馈)：https://www.notion.so/3217523c7c938087b6dfe6051c0e7006
+- Tasks (任务)：https://www.notion.so/3217523c7c9380c2a87df2688fa5f978
+- Docs (团队文档)：https://www.notion.so/3217523c7c9380ccb769c9378d18a1a8
+- Expense Claims (报销记录)：https://www.notion.so/3217523c7c9380ca90b1c0f60d730e57
+- Recruitments (招聘记录)：https://www.notion.so/3217523c7c9380dc870ec790813b6d4e
+- Decisions (重要决策记录)：https://www.notion.so/3467523c7c93807bbf44e159d158cd52
+- Budget & Finance Tracker (预算管理)：https://www.notion.so/Budget-Finance-Tracker-5ed7523c7c93823996d901e9b93d1fdc
+
+### Slack 使用说明
+
+1. 使用上方邀请链接或公司邮箱加入 Workspace
+2. 加入后阅读 [Slack 新用户指南](https://app.slack.com/slackhelp/zh-CN/218080037) 快速上手
+3. 加入相关频道（feedback、expense-claim、recruitments、dashboard）以接收通知
+
+### Notion 使用说明
+
+1. 通过上方邀请链接加入 Notion 团队
+2. 参考 [Notion 新手指南](https://www.notion.com/help/category/new-to-notion) 了解基本操作
+3. 通过上方 Notion Databases 链接可直接访问各数据库查看和处理条目
+
+---
+
 ## 目录
 
 1. [反馈提交](#1-反馈提交)
@@ -133,6 +177,11 @@ Notion 数据查询（反馈 / 报销 / 招聘 / 任务）
 
 在 Slack 中用一句话提交报销，Agent 追问缺失信息后写入 Notion，同时推送审批消息到 #expense-claims 频道。审批人点击按钮审批，审批通过后自动通知付款人，付款人确认付款后通知申请人。全流程在 Slack 中闭环完成。所有金额单位为 USD。
 
+### 配置说明
+
+- 默认审核人和付款人为 `@tracy`
+- 可在对话中指定其他处理人，例如：「我要报销打车 150，审批人 @sam」
+
 ### 应用场景
 
 - 出差回来随手报销：「我要报销上周打车 150」
@@ -240,6 +289,11 @@ Agent 写入 Notion（Approval Status: Pending）
 ### 技能说明
 
 在 Slack 中提到候选人信息，Agent 自动提取姓名、职位、来源、联系方式、面试时间等字段，确认后写入 Notion 招聘数据库。提交后自动通知 #recruitments 频道和 Interviewer。
+
+### 配置说明
+
+- 默认招聘处理人为 `@tracy`
+- 可在对话中指定其他处理人，例如：「录入候选人张三，处理人 @sam」
 
 ### 应用场景
 

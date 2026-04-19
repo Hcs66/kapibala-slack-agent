@@ -10,3 +10,9 @@
 
 ---
 
+已经完成了 roadmap_v4(docs/v4/kTeam_roadmap_v4.md)的phase 0、1、2、3、4、5
+
+继续更新文档：
+- 更新 `architecture` （docs/architecture.md）
+- 更新 `prd`(docs/prd.md)
+
