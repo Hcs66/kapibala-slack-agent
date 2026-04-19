@@ -24,7 +24,6 @@ export function expenseClaimToEntity(
     notionPageUrl: record.url,
     metadata: {
       amount: record.amount,
-      currency: record.currency,
       expenseType: record.expenseType,
       claimDescription: record.claimDescription,
     },

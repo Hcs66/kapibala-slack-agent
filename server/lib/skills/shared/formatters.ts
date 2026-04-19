@@ -28,8 +28,7 @@ export function formatExpenseClaimList(items: ExpenseClaimRecord[]): string {
   return items
     .map((e, i) => {
       const parts = [`${i + 1}. *${e.claimTitle}*`];
-      if (e.amount != null && e.currency)
-        parts.push(`${e.amount} ${e.currency}`);
+      if (e.amount != null) parts.push(`$${e.amount}`);
       if (e.expenseType) parts.push(`Type: ${e.expenseType}`);
       if (e.status) parts.push(`Status: ${e.status}`);
       if (e.submissionDate) parts.push(`Submitted: ${e.submissionDate}`);
@@ -131,9 +130,7 @@ export function formatPendingEntityList(
       if (item.priority) parts.push(`Priority: ${item.priority}`);
       if (item.dueDate) parts.push(`Due: ${item.dueDate}`);
       if (item.type === "expense_claim" && item.metadata.amount != null) {
-        parts.push(
-          `${item.metadata.amount} ${(item.metadata.currency as string) ?? "USD"}`,
-        );
+        parts.push(`$${item.metadata.amount}`);
       }
       parts.push(`<${item.notionPageUrl}|View>`);
       return parts.join(" | ");

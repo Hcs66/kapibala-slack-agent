@@ -12,7 +12,6 @@ export interface DailyDigest {
     url: string;
     claimTitle: string;
     amount: number | null;
-    currency: string | null;
     submittedBy: Array<{ id: string; name: string | null }>;
   }>;
   approvedExpenses: Array<{
@@ -20,7 +19,6 @@ export interface DailyDigest {
     url: string;
     claimTitle: string;
     amount: number | null;
-    currency: string | null;
     submittedBy: Array<{ id: string; name: string | null }>;
   }>;
   pendingRecruitment: Array<{
@@ -238,7 +236,6 @@ export async function getDailyDigest(): Promise<DailyDigest> {
       url: e.url,
       claimTitle: e.claimTitle,
       amount: e.amount,
-      currency: e.currency,
       submittedBy: e.submittedBy,
     })),
     approvedExpenses: approvedExpenses.map((e) => ({
@@ -246,7 +243,6 @@ export async function getDailyDigest(): Promise<DailyDigest> {
       url: e.url,
       claimTitle: e.claimTitle,
       amount: e.amount,
-      currency: e.currency,
       submittedBy: e.submittedBy,
     })),
     pendingRecruitment: pendingRecruitment.map((r) => ({

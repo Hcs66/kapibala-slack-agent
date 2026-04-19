@@ -8,7 +8,6 @@ interface ExpenseClaimPayMetadata {
   pageUrl: string;
   claimTitle: string;
   amount: number;
-  currency: string;
   expenseType: string;
   submitterId: string;
   reviewedBy: string;
@@ -66,7 +65,7 @@ const expenseClaimPayModalCallback = async ({
             text: {
               type: "mrkdwn",
               text: [
-                `💰 Your expense claim *${metadata.claimTitle}* (${metadata.amount} ${metadata.currency}) has been paid.`,
+                `💰 Your expense claim *${metadata.claimTitle}* ($${metadata.amount}) has been paid.`,
                 `*Payment Method:* ${paymentMethod}`,
                 `*Payment Date:* ${paymentDate}`,
                 `*Paid By:* <@${payerId}>`,
@@ -85,7 +84,7 @@ const expenseClaimPayModalCallback = async ({
             text: {
               type: "mrkdwn",
               text: [
-                `✅ Payment processed for *${metadata.claimTitle}* (${metadata.amount} ${metadata.currency})`,
+                `✅ Payment processed for *${metadata.claimTitle}* ($${metadata.amount})`,
                 `*Payment Method:* ${paymentMethod}`,
                 `*Payment Date:* ${paymentDate}`,
                 `*Notion:* <${metadata.pageUrl}|View in Notion>`,

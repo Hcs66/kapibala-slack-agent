@@ -14,7 +14,6 @@ interface ExpenseClaimAgentApprovalValue {
   pageUrl: string;
   claimTitle: string;
   amount: number;
-  currency: string;
   expenseType: string;
   submitterId: string;
   approved: boolean;
@@ -36,7 +35,6 @@ export const expenseClaimAgentApprovalCallback = async ({
     pageUrl,
     claimTitle,
     amount,
-    currency,
     expenseType,
     submitterId,
     approved,
@@ -63,7 +61,7 @@ export const expenseClaimAgentApprovalCallback = async ({
             text: [
               `\u23F3 *Expense Claim Processing (${status})...*`,
               `*Claim Title:* ${claimTitle}`,
-              `*Amount:* ${amount} ${currency}`,
+              `*Amount:* ${amount}`,
               `*Expense Type:* ${expenseType}`,
               `*Submitted By:* <@${submitterId}>`,
               `*Reviewed By:* <@${reviewedBy}>`,
@@ -104,7 +102,7 @@ export const expenseClaimAgentApprovalCallback = async ({
             text: {
               type: "mrkdwn",
               text: [
-                `${statusEmoji} Your expense claim *${claimTitle}* (${amount} ${currency}) has been *${status}* by <@${reviewedBy}>.`,
+                `${statusEmoji} Your expense claim *${claimTitle}* ($${amount}) has been *${status}* by <@${reviewedBy}>.`,
                 `*Notion:* <${pageUrl}|View in Notion>`,
               ].join("\n"),
             },
@@ -127,7 +125,6 @@ export const expenseClaimAgentApprovalCallback = async ({
               pageUrl,
               claimTitle,
               amount,
-              currency,
               expenseType,
               submitterId,
               reviewedBy,
@@ -151,7 +148,7 @@ export const expenseClaimAgentApprovalCallback = async ({
                       type: "mrkdwn",
                       text: [
                         `*Claim Title:* ${claimTitle}`,
-                        `*Amount:* ${amount} ${currency}`,
+                        `*Amount:* ${amount}`,
                         `*Expense Type:* ${expenseType}`,
                         `*Submitted By:* <@${submitterId}>`,
                         `*Approved By:* <@${reviewedBy}>`,
@@ -208,7 +205,7 @@ export const expenseClaimAgentApprovalCallback = async ({
               text: [
                 `${statusEmoji} *Expense Claim ${status}*`,
                 `*Claim Title:* ${claimTitle}`,
-                `*Amount:* ${amount} ${currency}`,
+                `*Amount:* ${amount}`,
                 `*Expense Type:* ${expenseType}`,
                 `*Submitted By:* <@${submitterId}>`,
                 `*Reviewed By:* <@${reviewedBy}>`,
@@ -235,7 +232,7 @@ export const expenseClaimAgentApprovalCallback = async ({
               text: [
                 `\u26A0\uFE0F *Expense Claim ${status} (Sync Failed)*`,
                 `*Claim Title:* ${claimTitle}`,
-                `*Amount:* ${amount} ${currency}`,
+                `*Amount:* ${amount}`,
                 `*Expense Type:* ${expenseType}`,
                 `*Submitted By:* <@${submitterId}>`,
                 `*Reviewed By:* <@${reviewedBy}>`,

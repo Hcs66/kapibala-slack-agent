@@ -21,8 +21,7 @@ function buildExpenseSection(
   }
 
   const lines = expenses.map((e) => {
-    const amount =
-      e.amount !== null ? `${e.amount} ${e.currency ?? ""}`.trim() : "N/A";
+    const amount = e.amount !== null ? `$${e.amount}` : "N/A";
     const submitter =
       e.submittedBy.length > 0
         ? (e.submittedBy[0].name ?? "Unknown")

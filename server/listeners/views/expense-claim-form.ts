@@ -37,7 +37,6 @@ const expenseClaimFormCallback = async ({
     const claimTitle = values.claim_title.value.value ?? "";
     const claimDescription = values.claim_description.value.value ?? "";
     const amount = Number.parseFloat(values.amount.value.value ?? "0");
-    const currency = "USD";
     const expenseType = values.expense_type.value.selected_option?.value ?? "";
 
     let approverSlackId: string | null = null;
@@ -113,7 +112,7 @@ const expenseClaimFormCallback = async ({
 
     const fields = [
       `*Claim Title:* ${claimTitle}`,
-      `*Amount:* ${amount} ${currency}`,
+      `*Amount:* $${amount}`,
       `*Expense Type:* ${expenseType}`,
       `*Submitted By:* <@${submitterId}>`,
     ];
@@ -155,7 +154,6 @@ const expenseClaimFormCallback = async ({
       pageUrl,
       claimTitle,
       amount,
-      currency,
       expenseType,
       submitterId,
       approved: true,
@@ -165,7 +163,6 @@ const expenseClaimFormCallback = async ({
       pageUrl,
       claimTitle,
       amount,
-      currency,
       expenseType,
       submitterId,
       approved: false,

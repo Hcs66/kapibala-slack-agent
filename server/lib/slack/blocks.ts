@@ -106,7 +106,6 @@ export const expenseClaimApprovalBlocks = ({
   pageUrl,
   claimTitle,
   amount,
-  currency,
   expenseType,
   submitterId,
 }: {
@@ -114,13 +113,12 @@ export const expenseClaimApprovalBlocks = ({
   pageUrl: string;
   claimTitle: string;
   amount: number;
-  currency: string;
   expenseType: string;
   submitterId: string;
 }): KnownBlock[] => {
   const fields = [
     `*Claim Title:* ${claimTitle}`,
-    `*Amount:* ${amount} ${currency}`,
+    `*Amount:* $${amount}`,
     `*Expense Type:* ${expenseType}`,
     `*Submitted By:* <@${submitterId}>`,
     `*Notion:* <${pageUrl}|View in Notion>`,
@@ -131,7 +129,6 @@ export const expenseClaimApprovalBlocks = ({
     pageUrl,
     claimTitle,
     amount,
-    currency,
     expenseType,
     submitterId,
   };
@@ -174,19 +171,17 @@ export const expenseInvoiceUploadBlocks = ({
   pageUrl,
   claimTitle,
   amount,
-  currency,
 }: {
   pageId: string;
   pageUrl: string;
   claimTitle: string;
   amount: number;
-  currency: string;
 }): KnownBlock[] => {
   const sectionBlock: SectionBlock = {
     type: "section",
     text: {
       type: "mrkdwn",
-      text: `📎 报销 *${claimTitle}* (${amount} ${currency}) 已提交。\n如需上传发票/收据附件，请点击下方按钮。\n<${pageUrl}|在 Notion 中查看>`,
+      text: `📎 报销 *${claimTitle}* ($${amount}) 已提交。\n如需上传发票/收据附件，请点击下方按钮。\n<${pageUrl}|在 Notion 中查看>`,
     },
   };
 

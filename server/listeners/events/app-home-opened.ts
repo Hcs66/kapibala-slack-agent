@@ -37,8 +37,7 @@ function buildItemLine(item: WorkflowEntity): string {
     parts.push(isOverdue ? `⚠️ Due: ${item.dueDate}` : `Due: ${item.dueDate}`);
   }
   if (item.type === "expense_claim" && item.metadata.amount != null) {
-    const currency = (item.metadata.currency as string) ?? "USD";
-    parts.push(`${item.metadata.amount} ${currency}`);
+    parts.push(`$${item.metadata.amount}`);
   }
   return parts.join("  ·  ");
 }
@@ -54,7 +53,7 @@ function buildCategorySection(
 
   const lines = items.slice(0, 10).map(buildItemLine);
   const overflow =
-    items.length > 10 ? `\n_...and ${items.length - 10} more_` : "";
+    items.length > 10 ? `\n_...and ${items.length - 10} more_` : "\n";
 
   return [
     {

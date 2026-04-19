@@ -10,7 +10,6 @@ interface ExpenseClaimPayValue {
   pageUrl: string;
   claimTitle: string;
   amount: number;
-  currency: string;
   expenseType: string;
   submitterId: string;
   reviewedBy: string;
@@ -37,7 +36,6 @@ export const expenseClaimPayCallback = async ({
         pageUrl: value.pageUrl,
         claimTitle: value.claimTitle,
         amount: value.amount,
-        currency: value.currency,
         expenseType: value.expenseType,
         submitterId: value.submitterId,
         reviewedBy: value.reviewedBy,
@@ -59,7 +57,7 @@ export const expenseClaimPayCallback = async ({
           type: "section",
           text: {
             type: "mrkdwn",
-            text: `*Claim:* ${value.claimTitle}\n*Amount:* ${value.amount} ${value.currency}`,
+            text: `*Claim:* ${value.claimTitle}\n*Amount:* $${value.amount}`,
           },
         },
         {

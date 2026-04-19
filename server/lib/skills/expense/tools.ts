@@ -116,7 +116,6 @@ export const submitExpenseClaim = tool({
             pageUrl,
             claimTitle,
             amount,
-            currency: "USD",
             expenseType,
             submitterId: ctx.user_id,
           }),
@@ -132,7 +131,6 @@ export const submitExpenseClaim = tool({
           pageUrl,
           claimTitle,
           amount,
-          currency: "USD",
         }),
       });
 

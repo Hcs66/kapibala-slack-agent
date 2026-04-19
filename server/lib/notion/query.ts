@@ -107,7 +107,6 @@ export interface ExpenseClaimRecord {
   claimTitle: string;
   claimDescription: string;
   amount: number | null;
-  currency: string | null;
   expenseType: string | null;
   submissionDate: string | null;
   status: string | null;
@@ -186,7 +185,6 @@ export function parseExpenseClaimPage(
     claimTitle: extractTitle(p["Claim Title"]),
     claimDescription: extractRichText(p["Claim Description"]),
     amount: extractNumber(p.Amount),
-    currency: extractSelect(p.Currency),
     expenseType: extractSelect(p["Expense Type"]),
     submissionDate: extractDate(p["Submission Date"]),
     status: extractStatus(p["Status"]),
@@ -375,7 +373,6 @@ export async function queryExpenseClaims(filters?: {
       "Claim Title",
       "Claim Description",
       "Amount",
-      "Currency",
       "Expense Type",
       "Submission Date",
       "Status",

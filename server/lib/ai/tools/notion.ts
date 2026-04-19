@@ -51,8 +51,7 @@ function formatExpenseClaimList(items: ExpenseClaimRecord[]): string {
   return items
     .map((e, i) => {
       const parts = [`${i + 1}. *${e.claimTitle}*`];
-      if (e.amount != null && e.currency)
-        parts.push(`${e.amount} ${e.currency}`);
+      if (e.amount != null) parts.push(`$${e.amount}`);
       if (e.expenseType) parts.push(`Type: ${e.expenseType}`);
       if (e.status) parts.push(`Status: ${e.status}`);
       if (e.submissionDate) parts.push(`Submitted: ${e.submissionDate}`);
@@ -456,7 +455,6 @@ const submitExpenseClaim = tool({
             pageUrl,
             claimTitle,
             amount,
-            currency: "USD",
             expenseType,
             submitterId: ctx.user_id,
           }),
@@ -472,7 +470,6 @@ const submitExpenseClaim = tool({
           pageUrl,
           claimTitle,
           amount,
-          currency: "USD",
         }),
       });
 

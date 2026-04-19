@@ -14,7 +14,6 @@ describe("expenseClaimToEntity", () => {
       claimTitle: "Taxi fare",
       claimDescription: "Airport taxi",
       amount: 100,
-      currency: "USD",
       expenseType: "Travel",
       submissionDate: "2026-03-25",
       status: "Pending",
@@ -26,7 +25,6 @@ describe("expenseClaimToEntity", () => {
     expect(entity.status).toBe("pending");
     expect(entity.owner).toBe("u1");
     expect(entity.metadata.amount).toBe(100);
-    expect(entity.metadata.currency).toBe("USD");
   });
 
   it("maps Approved status correctly", () => {
@@ -36,7 +34,6 @@ describe("expenseClaimToEntity", () => {
       claimTitle: "Lunch",
       claimDescription: "",
       amount: 50,
-      currency: "USD",
       expenseType: "Meals",
       submissionDate: "2026-03-25",
       status: "Approved",
@@ -54,7 +51,6 @@ describe("expenseClaimToEntity", () => {
       claimTitle: "Equipment",
       claimDescription: "",
       amount: 200,
-      currency: "USD",
       expenseType: "Equipment",
       submissionDate: "2026-03-20",
       status: "Paid",
@@ -71,7 +67,6 @@ describe("expenseClaimToEntity", () => {
       claimTitle: "Unknown",
       claimDescription: "",
       amount: null,
-      currency: null,
       expenseType: null,
       submissionDate: null,
       status: null,
