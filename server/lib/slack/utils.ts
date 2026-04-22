@@ -6,6 +6,7 @@ import type {
 } from "@slack/web-api";
 import type { MessageElement } from "@slack/web-api/dist/types/response/ConversationsHistoryResponse";
 import type { ModelMessage } from "ai";
+import type { FileExtractionResult } from "~/lib/ai/file-processor";
 
 // Slack only allows up to 10 loading messages
 const formatLoadingMessages = (loadingMessages: string[]): string[] => {
@@ -41,6 +42,41 @@ export type SlackUIMessage = ModelMessage & {
   metadata?: MessageElement;
 };
 
+function formatFileExtractions(extractions: FileExtractionResult[]): string {
+  return extractions
+    .map((ext) => {
+      if (ext.extractedText) {
+        return `\n\n[Attachment: ${ext.fileName} (${ext.fileType})]\n${ext.extractedText}`;
+      }
+      if (ext.error) {
+        return `\n\n[Failed to process: ${ext.fileName} — ${ext.error}]`;
+      }
+      if (ext.fileType === "unsupported") {
+        return `\n\n[Unsupported file: ${ext.fileName}]`;
+      }
+      return "";
+    })
+    .join("");
+}
+
+async function enrichContentWithFiles(
+  text: string | undefined,
+  files: MessageElement["files"],
+  token?: string,
+): Promise<string> {
+  let content = text || "";
+  if (!files?.length || !token) return content;
+
+  try {
+    const { extractFilesFromMessage } = await import("~/lib/ai/file-processor");
+    const extractions = await extractFilesFromMessage(files, token);
+    content += formatFileExtractions(extractions);
+  } catch (error) {
+    console.error("Failed to extract files from message:", error);
+  }
+  return content;
+}
+
 const getThreadContext = async (
   args: ConversationsRepliesArguments,
   client: WebClient,
@@ -51,27 +87,36 @@ const getThreadContext = async (
 };
 
 export const getThreadContextAsModelMessage = async (
-  args: ConversationsRepliesArguments & { botId?: string; client: WebClient },
+  args: ConversationsRepliesArguments & {
+    botId?: string;
+    client: WebClient;
+    token?: string;
+  },
 ): Promise<SlackUIMessage[]> => {
-  const { botId, client, ...repliesArgs } = args;
+  const { botId, client, token, ...repliesArgs } = args;
   const messages = await getThreadContext(repliesArgs, client);
 
-  return messages.map((message) => {
-    const { bot_id, text, user, ts, thread_ts, type } = message;
-    // If botId provided, match exactly; otherwise treat any bot message as assistant
-    const isAssistant = botId ? bot_id === botId : !!bot_id;
-    return {
-      role: isAssistant ? "assistant" : "user",
-      content: text,
-      metadata: {
-        user: user || null,
-        bot_id: bot_id || null,
-        ts,
-        thread_ts,
-        type,
-      },
-    };
-  });
+  return Promise.all(
+    messages.map(async (message) => {
+      const { bot_id, text, user, ts, thread_ts, type, files } = message;
+      const isAssistant = botId ? bot_id === botId : !!bot_id;
+      const content = isAssistant
+        ? text || ""
+        : await enrichContentWithFiles(text, files, token);
+
+      return {
+        role: isAssistant ? ("assistant" as const) : ("user" as const),
+        content,
+        metadata: {
+          user: user || null,
+          bot_id: bot_id || null,
+          ts,
+          thread_ts,
+          type,
+        },
+      };
+    }),
+  );
 };
 
 const getChannelContext = async (
@@ -83,27 +128,36 @@ const getChannelContext = async (
 };
 
 export const getChannelContextAsModelMessage = async (
-  args: ConversationsHistoryArguments & { botId?: string; client: WebClient },
+  args: ConversationsHistoryArguments & {
+    botId?: string;
+    client: WebClient;
+    token?: string;
+  },
 ): Promise<SlackUIMessage[]> => {
-  const { botId, client, ...historyArgs } = args;
+  const { botId, client, token, ...historyArgs } = args;
   const messages = await getChannelContext(historyArgs, client);
 
-  return messages.map((message) => {
-    const { bot_id, text, user, ts, thread_ts, type } = message;
-    // If botId provided, match exactly; otherwise treat any bot message as assistant
-    const isAssistant = botId ? bot_id === botId : !!bot_id;
-    return {
-      role: isAssistant ? "assistant" : "user",
-      content: text,
-      metadata: {
-        user: user || null,
-        bot_id: bot_id || null,
-        ts,
-        thread_ts,
-        type,
-      },
-    };
-  });
+  return Promise.all(
+    messages.map(async (message) => {
+      const { bot_id, text, user, ts, thread_ts, type, files } = message;
+      const isAssistant = botId ? bot_id === botId : !!bot_id;
+      const content = isAssistant
+        ? text || ""
+        : await enrichContentWithFiles(text, files, token);
+
+      return {
+        role: isAssistant ? ("assistant" as const) : ("user" as const),
+        content,
+        metadata: {
+          user: user || null,
+          bot_id: bot_id || null,
+          ts,
+          thread_ts,
+          type,
+        },
+      };
+    }),
+  );
 };
 
 export const addEmoji = async ({

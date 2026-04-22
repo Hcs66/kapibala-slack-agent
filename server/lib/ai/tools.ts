@@ -28,6 +28,7 @@ const getChannelMessages = tool({
         channel: channel_id,
         botId: ctx.bot_id,
         client,
+        token: ctx.token,
       });
       return {
         success: true,
@@ -69,6 +70,7 @@ const getThreadMessages = tool({
         ts: thread_ts,
         botId: ctx.bot_id,
         client,
+        token: ctx.token,
       });
       return {
         success: true,

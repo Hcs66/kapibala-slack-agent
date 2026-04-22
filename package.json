@@ -23,6 +23,7 @@
     "@vercel/slack-bolt": "latest",
     "@workflow/ai": "4.1.0-beta.57",
     "ai": "^6.0.134",
+    "unpdf": "^1.6.0",
     "vercel-minimax-ai-provider": "^0.0.2",
     "workflow": "4.2.0-beta.71",
     "zod": "^4.3.6"

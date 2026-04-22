@@ -35,6 +35,7 @@ const appMentionCallback = async ({
       ts: thread_ts,
       botId: context.botId,
       client,
+      token: getClientToken(client),
     });
 
     const run = await start(chatWorkflow, [

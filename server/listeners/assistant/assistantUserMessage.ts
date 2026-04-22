@@ -43,10 +43,11 @@ export const assistantUserMessage: AssistantUserMessageMiddleware = async ({
   let messages: ModelMessage[] = [];
   try {
     messages = await getThreadContextAsModelMessage({
-      channel, // Use the actual DM channel, not the context channel
+      channel,
       ts: thread_ts,
       botId,
       client,
+      token: getClientToken(client),
     });
 
     const run = await start(chatWorkflow, [
